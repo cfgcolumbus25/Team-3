@@ -1,175 +1,222 @@
+import { useState } from "react";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Navigation } from "@/components/Navigation";
 import { Sidebar } from "@/components/Sidebar";
 import { 
-  Bell, 
-  Mail, 
-  Database, 
-  TrendingUp, 
-  Users, 
-  AlertTriangle,
+  Bell,
+  Mail,
+  Edit3,
   CheckCircle2,
-  Clock
+  AlertTriangle,
+  Search,
+  Database,
 } from "lucide-react";
 
-const AdminPortal = () => {
-  const stats = [
-    {
-      label: "Total Institutions",
-      value: "2,547",
-      change: "+12%",
-      icon: Users,
-      color: "text-primary"
-    },
-    {
-      label: "Data Freshness",
-      value: "87%",
-      change: "-3%",
-      icon: Database,
-      color: "text-success"
-    },
-    {
-      label: "Pending Alerts",
-      value: "43",
-      change: "+5",
-      icon: AlertTriangle,
-      color: "text-warning"
-    },
-    {
-      label: "User Searches",
-      value: "15.2K",
-      change: "+23%",
-      icon: TrendingUp,
-      color: "text-secondary"
-    }
-  ];
+import { getAllUniversities } from "@/lib/universityDatabase";
 
-  const recentAlerts = [
-    {
-      institution: "University of Example",
-      type: "Data Outdated",
-      priority: "high",
-      date: "6 months ago"
-    },
-    {
-      institution: "State College",
-      type: "Missing Data",
-      priority: "medium",
-      date: "3 months ago"
-    },
-    {
-      institution: "Tech Institute",
-      type: "Verification Pending",
-      priority: "low",
-      date: "1 week ago"
-    }
-  ];
+export default function AdminPortal() {
+  // ✅ Load college data directly from JSON
+  const [colleges, setColleges] = useState(() =>
+    getAllUniversities().map((u, idx) => ({
+      id: idx + 1,
+      name: u.name,
+      acceptsCLEP: u.acceptsCLEP ? "Yes" : "No",
+      minScore: u.avgScore || "-",
+      subjects: u.clepPolicies?.length || 0,
+      lastUpdated: u.lastUpdated || "Unknown"
+    }))
+  );
+
+  // ✅ Alerts stay local
+  const [alerts, setAlerts] = useState([
+    { id: 1, college: "Ohio State University", reason: "Outdated CLEP policy", priority: "high", status: "pending" },
+    { id: 2, college: "Miami University", reason: "Missing exam scores", priority: "medium", status: "pending" },
+    { id: 3, college: "University of Cincinnati", reason: "Negative feedback received", priority: "high", status: "pending" },
+  ]);
+
+  const [editingId, setEditingId] = useState<number | null>(null);
+  const [search, setSearch] = useState("");
+
+  const handleSendEmail = (id: number) => {
+    setAlerts(alerts.map(a => a.id === id ? { ...a, status: "sent" } : a));
+  };
+
+  const handleDismissAlert = (id: number) => {
+    setAlerts(alerts.filter(a => a.id !== id));
+  };
+
+  const filteredColleges = colleges.filter(c =>
+    c.name.toLowerCase().includes(search.toLowerCase())
+  );
 
   return (
     <div className="min-h-screen bg-background">
       <Navigation />
-      
       <div className="flex">
         <Sidebar role="admin" />
-        
-        <main className="flex-1 p-8">
-          {/* KPI Cards */}
-          <div className="grid md:grid-cols-4 gap-6 mb-8">
-            {stats.map((stat, i) => (
-              <Card key={i} className="p-6 shadow-card hover-lift">
-                <div className="flex items-start justify-between mb-4">
-                  <div className={`p-3 rounded-lg bg-primary/10 ${stat.color}`}>
-                    <stat.icon className="h-6 w-6" />
-                  </div>
-                  <Badge variant={stat.change.startsWith('+') ? "default" : "destructive"}>
-                    {stat.change}
-                  </Badge>
-                </div>
-                <div className="text-3xl font-bold mb-1">{stat.value}</div>
-                <div className="text-sm text-muted-foreground">{stat.label}</div>
-              </Card>
-            ))}
-          </div>
 
-          <div className="grid md:grid-cols-2 gap-6 mb-8">
-            {/* Recent Alerts */}
-            <Card className="p-6 shadow-card">
-              <div className="flex items-center justify-between mb-6">
-                <h2 className="text-xl font-bold">Recent Alerts</h2>
-                <Button variant="outline" size="sm">View All</Button>
-              </div>
-              <div className="space-y-4">
-                {recentAlerts.map((alert, i) => (
-                  <div key={i} className="flex items-start gap-4 p-4 rounded-lg border hover:bg-muted/50 transition-smooth cursor-pointer">
-                    <AlertTriangle className={`h-5 w-5 mt-0.5 ${
-                      alert.priority === 'high' ? 'text-destructive' : 
-                      alert.priority === 'medium' ? 'text-warning' : 
-                      'text-muted-foreground'
-                    }`} />
-                    <div className="flex-1">
-                      <div className="font-semibold">{alert.institution}</div>
-                      <div className="text-sm text-muted-foreground">{alert.type}</div>
-                    </div>
-                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                      <Clock className="h-3 w-3" />
-                      {alert.date}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </Card>
+        <main className="flex-1 p-8 space-y-8">
 
-            {/* Email Tracking */}
-            <Card className="p-6 shadow-card">
-              <div className="flex items-center justify-between mb-6">
-                <h2 className="text-xl font-bold">Email Communication</h2>
-                <Button variant="outline" size="sm">Send Bulk</Button>
-              </div>
-              <div className="space-y-4">
-                {[
-                  { status: "delivered", count: 234, color: "text-success" },
-                  { status: "opened", count: 187, color: "text-primary" },
-                  { status: "bounced", count: 12, color: "text-destructive" }
-                ].map((item, i) => (
-                  <div key={i} className="flex items-center justify-between p-4 rounded-lg border">
-                    <div className="flex items-center gap-3">
-                      <CheckCircle2 className={`h-5 w-5 ${item.color}`} />
-                      <span className="capitalize font-medium">{item.status}</span>
-                    </div>
-                    <Badge variant="secondary">{item.count}</Badge>
-                  </div>
-                ))}
-              </div>
-            </Card>
-          </div>
-
-          {/* Quick Actions */}
+          {/* ✅ ALERT SYSTEM */}
           <Card className="p-6 shadow-card">
-            <h2 className="text-xl font-bold mb-6">Quick Actions</h2>
-            <div className="grid md:grid-cols-3 gap-4">
-              <Button variant="outline" className="h-auto py-6 flex flex-col gap-2 hover-lift">
-                <Database className="h-8 w-8 text-primary" />
-                <span className="font-semibold">Data Override</span>
-                <span className="text-xs text-muted-foreground">Manually update institution data</span>
-              </Button>
-              <Button variant="outline" className="h-auto py-6 flex flex-col gap-2 hover-lift">
-                <Mail className="h-8 w-8 text-secondary" />
-                <span className="font-semibold">Bulk Email</span>
-                <span className="text-xs text-muted-foreground">Send reminders to institutions</span>
-              </Button>
-              <Button variant="outline" className="h-auto py-6 flex flex-col gap-2 hover-lift">
-                <TrendingUp className="h-8 w-8 text-accent" />
-                <span className="font-semibold">Generate Report</span>
-                <span className="text-xs text-muted-foreground">Export analytics and insights</span>
-              </Button>
+            <div className="flex items-center justify-between mb-6">
+              <div className="flex items-center gap-3">
+                <Bell className="h-6 w-6 text-warning" />
+                <h2 className="text-xl font-bold">Alert System</h2>
+              </div>
+              <Badge>{alerts.length} Active</Badge>
+            </div>
+
+            {alerts.length === 0 ? (
+              <p className="text-muted-foreground text-center py-8">No active alerts</p>
+            ) : (
+              <div className="space-y-4">
+                {alerts.map(alert => (
+                  <Card
+                    key={alert.id}
+                    className={`p-4 border-l-4 ${
+                      alert.priority === "high"
+                        ? "border-destructive bg-destructive/10"
+                        : "border-warning bg-warning/10"
+                    }`}
+                  >
+                    <div className="flex justify-between items-start">
+                      <div className="space-y-1">
+                        <div className="font-semibold">{alert.college}</div>
+                        <div className="text-sm text-muted-foreground">{alert.reason}</div>
+                        <Badge variant={alert.priority === "high" ? "destructive" : "default"}>
+                          {alert.priority.toUpperCase()}
+                        </Badge>
+                      </div>
+
+                      {alert.status === "pending" ? (
+                        <div className="flex gap-2">
+                          <Button size="sm" onClick={() => handleSendEmail(alert.id)}>
+                            <Mail className="h-4 w-4 mr-1" /> Send Email
+                          </Button>
+                          <Button size="sm" variant="outline" onClick={() => handleDismissAlert(alert.id)}>
+                            Dismiss
+                          </Button>
+                        </div>
+                      ) : (
+                        <span className="flex items-center gap-1 text-green-600 text-sm">
+                          <CheckCircle2 className="h-4 w-4" /> Sent
+                        </span>
+                      )}
+                    </div>
+                  </Card>
+                ))}
+              </div>
+            )}
+          </Card>
+
+          {/* ✅ COLLEGE DATABASE (from JSON) */}
+          <Card className="p-6 shadow-card">
+            <div className="flex items-center justify-between mb-6">
+              <div className="flex items-center gap-3">
+                <Database className="h-6 w-6 text-primary" />
+                <h2 className="text-xl font-bold">College Database</h2>
+              </div>
+
+              <div className="relative w-64">
+                <Search className="h-4 w-4 text-muted-foreground absolute left-2 top-1/2 -translate-y-1/2" />
+                <Input
+                  placeholder="Search colleges..."
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  className="pl-8"
+                />
+              </div>
+            </div>
+
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b">
+                    <th className="py-3 text-left">College Name</th>
+                    <th className="py-3 text-left">Accepts CLEP</th>
+                    <th className="py-3 text-left">Min Score</th>
+                    <th className="py-3 text-left">Subjects</th>
+                    <th className="py-3 text-left">Last Updated</th>
+                    <th className="py-3 text-left">Actions</th>
+                  </tr>
+                </thead>
+
+                <tbody>
+                  {filteredColleges.map(col => (
+                    <tr key={col.id} className="border-b hover:bg-muted/50">
+                      <td className="py-3">
+                        {editingId === col.id ? (
+                          <Input
+                            value={col.name}
+                            onChange={(e) =>
+                              setColleges(colleges.map(c =>
+                                c.id === col.id ? { ...c, name: e.target.value } : c
+                              ))
+                            }
+                          />
+                        ) : (
+                          <span>{col.name}</span>
+                        )}
+                      </td>
+
+                      <td className="py-3">
+                        {editingId === col.id ? (
+                          <select
+                            className="border rounded p-1"
+                            value={col.acceptsCLEP}
+                            onChange={(e) =>
+                              setColleges(colleges.map(c =>
+                                c.id === col.id ? { ...c, acceptsCLEP: e.target.value } : c
+                              ))
+                            }
+                          >
+                            <option>Yes</option>
+                            <option>No</option>
+                            <option>Partial</option>
+                          </select>
+                        ) : (
+                          <Badge
+                            variant={
+                              col.acceptsCLEP === "Yes"
+                                ? "default"
+                                : col.acceptsCLEP === "Partial"
+                                ? "secondary"
+                                : "destructive"
+                            }
+                          >
+                            {col.acceptsCLEP}
+                          </Badge>
+                        )}
+                      </td>
+
+                      <td className="py-3">{col.minScore}</td>
+                      <td className="py-3">{col.subjects}</td>
+                      <td className="py-3 text-muted-foreground">{col.lastUpdated}</td>
+
+                      <td className="py-3">
+                        {editingId === col.id ? (
+                          <Button size="sm" onClick={() => setEditingId(null)}>
+                            Save
+                          </Button>
+                        ) : (
+                          <Button size="sm" variant="outline" onClick={() => setEditingId(col.id)}>
+                            <Edit3 className="h-4 w-4 mr-1" /> Edit
+                          </Button>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
           </Card>
+
         </main>
       </div>
     </div>
   );
-};
-
-export default AdminPortal;
+}
