@@ -1289,8 +1289,8 @@ const LearnerPortal = () => {
                                   )}
                                 </td>
                                 <td className="p-3 whitespace-nowrap">
-                                  {exam.courseEquivalent ? (
-                                    <span className="font-medium">{exam.courseEquivalent}</span>
+                                  {exam.courseCode ? (
+                                    <span className="font-medium">{exam.courseCode}</span>
                                   ) : (
                                     <span className="text-muted-foreground">-</span>
                                   )}
