@@ -13,7 +13,6 @@ import InstitutionReports from "./pages/InstitutionReports";
 import InstitutionSettings from "./pages/InstitutionSettings";
 import InstitutionLogin from "./pages/InstitutionLogin";
 import AdminPortal from "./pages/AdminPortal";
-import AdminDataManagement from "./pages/AdminDataManagement";
 import AdminReports from "./pages/AdminReports";
 import AdminSettings from "./pages/AdminSettings";
 import AdminLogin from "./pages/AdminLogin";
@@ -73,14 +72,7 @@ const App = () => (
                 </ProtectedRoute>
               }
             />
-            <Route
-              path="/admin/data-management"
-              element={
-                <ProtectedRoute allowedRoles={["admin"]}>
-                  <AdminDataManagement />
-                </ProtectedRoute>
-              }
-            />
+            
             <Route
               path="/admin/reports"
               element={
