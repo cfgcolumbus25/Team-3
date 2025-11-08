@@ -6,6 +6,8 @@ import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 
+//const [pendingActions, setPendingActions] = useState<any[] | null>(null);
+
 interface Message {
   id: string;
   text: string;
@@ -20,6 +22,7 @@ interface InstitutionChatbotProps {
 }
 
 export const InstitutionChatbot = ({ open, onOpenChange }: InstitutionChatbotProps) => {
+  const [pendingActions, setPendingActions] = useState<any[] | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
@@ -64,7 +67,7 @@ export const InstitutionChatbot = ({ open, onOpenChange }: InstitutionChatbotPro
     setInput(actionMessages[action] || "");
     setTimeout(() => handleSend(actionMessages[action]), 100);
   };
-
+  /*
   const getAIResponse = (userMessage: string): { text: string; actions?: { label: string; onClick: () => void }[] } => {
     const lower = userMessage.toLowerCase();
 
@@ -89,7 +92,7 @@ export const InstitutionChatbot = ({ open, onOpenChange }: InstitutionChatbotPro
         ],
       };
     }
-
+    
     // View data
     if (lower.includes("view") || lower.includes("show")) {
       return {
@@ -137,34 +140,110 @@ export const InstitutionChatbot = ({ open, onOpenChange }: InstitutionChatbotPro
       ],
     };
   };
+  */
+  
 
-  const handleSend = (customMessage?: string) => {
+  const handleSend = async (customMessage?: string) => {
     const messageText = customMessage || input.trim();
     if (!messageText || isLoading) return;
 
+    // Display USER message
     const userMessage: Message = {
       id: Date.now().toString(),
       text: messageText,
       sender: "user",
       timestamp: new Date(),
     };
-
-    setMessages((prev) => [...prev, userMessage]);
+    setMessages(prev => [...prev, userMessage]);
     setInput("");
     setIsLoading(true);
 
-    setTimeout(() => {
-      const response = getAIResponse(messageText);
+    // If we are waiting for confirmation
+    if (pendingActions) {
+      const answer = messageText.toLowerCase();
+
+      if (answer.includes("yes")) {
+        // User confirmed -> commit updates
+        try {
+          const res = await fetch("/api/confirm-update", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ actions: pendingActions })
+          });
+
+          const data = await res.json();
+
+          const aiMessage: Message = {
+            id: (Date.now() + 1).toString(),
+            text: data.reply,
+            sender: "ai",
+            timestamp: new Date(),
+          };
+
+          setMessages(prev => [...prev, aiMessage]);
+          setPendingActions(null); // reset state
+          setIsLoading(false);
+          return;
+        } catch (err) {
+          setMessages(prev => [...prev, {
+            id: (Date.now() + 1).toString(),
+            text: "❌ Failed to update.",
+            sender: "ai",
+            timestamp: new Date()
+          }]);
+          setIsLoading(false);
+          return;
+        }
+      }
+
+      if (answer.includes("no")) {
+        // Cancel update
+        setMessages(prev => [...prev, {
+          id: (Date.now() + 1).toString(),
+          text: "Okay, I cancelled the update.",
+          sender: "ai",
+          timestamp: new Date()
+        }]);
+        setPendingActions(null);
+        setIsLoading(false);
+        return;
+      }
+    }
+
+    // Normal processing: detect update intent
+    try {
+      const res = await fetch("/api/update-college-intent", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ message: messageText })
+      });
+
+      const data = await res.json();
+
       const aiMessage: Message = {
         id: (Date.now() + 1).toString(),
-        text: response.text,
+        text: data.reply,
         sender: "ai",
         timestamp: new Date(),
-        actions: response.actions,
       };
-      setMessages((prev) => [...prev, aiMessage]);
-      setIsLoading(false);
-    }, 1000);
+
+      setMessages(prev => [...prev, aiMessage]);
+
+      // If Claude returned actions, save them
+      if (data.actions) {
+        setPendingActions(data.actions);
+      }
+
+    } catch (error) {
+      setMessages(prev => [...prev, {
+        id: (Date.now() + 1).toString(),
+        text: "Sorry, something went wrong.",
+        sender: "ai",
+        timestamp: new Date()
+      }]);
+    }
+
+    setIsLoading(false);
   };
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
