@@ -779,6 +779,12 @@ const LearnerPortal = () => {
                   className={`p-4 hover-lift cursor-pointer transition-all ${
                     college.highlighted ? "border-primary shadow-glow" : ""
                   }`}
+                  onClick={() => {
+                    // Navigate to institution login with the college's DI code
+                    // This allows the institution to view their own data
+                    const diCode = college.diCode.toString();
+                    window.location.href = `/login/institution?diCode=${diCode}`;
+                  }}
                 >
                   <div className="space-y-3">
                     <div className="flex items-start justify-between">

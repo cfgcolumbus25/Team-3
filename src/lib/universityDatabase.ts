@@ -351,6 +351,13 @@ export function getUniversityById(id: number): University | undefined {
   return universities.find(u => u.id === id);
 }
 
+// Get a single university by DI code
+export function getUniversityByDiCode(diCode: number | string): University | undefined {
+  const universities = getAllUniversities();
+  const code = typeof diCode === 'string' ? parseInt(diCode) : diCode;
+  return universities.find(u => u.diCode === code);
+}
+
 // Search universities by name
 export function searchUniversitiesByName(query: string): University[] {
   const universities = getAllUniversities();

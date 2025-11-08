@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -8,6 +8,9 @@ import { Navigation } from "@/components/Navigation";
 import { Sidebar } from "@/components/Sidebar";
 import { UploadDocumentModal } from "@/components/UploadDocumentModal";
 import { InstitutionChatbot } from "@/components/InstitutionChatbot";
+import { useAuth } from "@/contexts/AuthContext";
+import { getUniversityByDiCode } from "@/lib/universityDatabase";
+import { getInstitutionExamData, initializeDefaultExamData } from "@/lib/institutionDataStorage";
 import {
   Dialog,
   DialogContent,
@@ -28,20 +31,63 @@ import {
 
 const InstitutionPortal = () => {
   const navigate = useNavigate();
+  const { user } = useAuth();
   const [selectedExam, setSelectedExam] = useState<any>(null);
   const [showUploadModal, setShowUploadModal] = useState(false);
   const [showChatbot, setShowChatbot] = useState(false);
 
-  const examDetails = {
-    exam: "Biology",
-    fullName: "Biology (Natural Sciences)",
-    description: "Covers material usually taught in a one-semester general biology course",
-    currentMinScore: "50",
-    currentCredits: "3",
-    currentEquiv: "BIO 101",
-    lastUpdated: "March 15, 2024",
-    notes: "Lab component may be required separately"
-  };
+  // Get the university data for the logged-in institution
+  const university = useMemo(() => {
+    if (!user?.institution?.diCode) return null;
+    return getUniversityByDiCode(user.institution.diCode);
+  }, [user]);
+
+  // Get institution-specific exam data from localStorage
+  const institutionExamData = useMemo(() => {
+    if (!user?.institution?.id) return [];
+    const institutionId = user.institution.id;
+    initializeDefaultExamData(institutionId);
+    const storedData = getInstitutionExamData(institutionId);
+    
+    // Merge with university database data (prioritize stored data, fallback to database)
+    if (university) {
+      return university.clepPolicies.map(policy => {
+        const stored = storedData.find(e => 
+          e.examName.toLowerCase() === policy.examName.toLowerCase()
+        );
+        return {
+          examName: policy.examName,
+          minScore: stored?.minScore || (policy.minimumScore?.toString() || ""),
+          credits: stored?.credits || (policy.creditsAwarded?.toString() || ""),
+          courseCode: stored?.courseCode || (policy.classEquivalent || ""),
+          lastUpdated: stored?.lastUpdated || "Never",
+          category: stored?.category || "General"
+        };
+      });
+    }
+    return storedData;
+  }, [user, university]);
+
+  // Calculate statistics
+  const stats = useMemo(() => {
+    const totalExams = institutionExamData.length;
+    const completedExams = institutionExamData.filter(e => e.minScore && e.minScore !== "").length;
+    const completionPercentage = totalExams > 0 ? Math.round((completedExams / totalExams) * 100) : 0;
+    
+    // Find most recent update
+    const dates = institutionExamData
+      .map(e => e.lastUpdated)
+      .filter(d => d !== "Never")
+      .sort((a, b) => new Date(b).getTime() - new Date(a).getTime());
+    const lastUpdated = dates.length > 0 ? dates[0] : "Never";
+
+    return {
+      totalExams,
+      completedExams,
+      completionPercentage,
+      lastUpdated
+    };
+  }, [institutionExamData]);
 
   return (
     <div className="min-h-screen bg-background">
@@ -58,24 +104,28 @@ const InstitutionPortal = () => {
                 <div className="text-sm text-muted-foreground mb-2">Last Updated</div>
                 <div className="flex items-center gap-2">
                   <Calendar className="h-4 w-4 text-primary" />
-                  <span className="font-semibold">March 15, 2024</span>
+                  <span className="font-semibold">
+                    {stats.lastUpdated === "Never" 
+                      ? "Never" 
+                      : new Date(stats.lastUpdated).toLocaleDateString()}
+                  </span>
                 </div>
               </div>
               <div>
                 <div className="text-sm text-muted-foreground mb-2">Data Completion</div>
                 <div className="space-y-2">
                   <div className="flex items-center justify-between text-sm">
-                    <span className="font-semibold">87%</span>
-                    <span className="text-muted-foreground">34 exams tracked</span>
+                    <span className="font-semibold">{stats.completionPercentage}%</span>
+                    <span className="text-muted-foreground">{stats.completedExams} of {stats.totalExams} exams</span>
                   </div>
-                  <Progress value={87} className="h-2" />
+                  <Progress value={stats.completionPercentage} className="h-2" />
                 </div>
               </div>
               <div>
                 <div className="text-sm text-muted-foreground mb-2">Status</div>
-                <Badge variant="default" className="gap-1">
+                <Badge variant={stats.completionPercentage >= 80 ? "default" : "secondary"} className="gap-1">
                   <CheckCircle2 className="h-3 w-3" />
-                  Up to Date
+                  {stats.completionPercentage >= 80 ? "Up to Date" : "In Progress"}
                 </Badge>
               </div>
             </div>
@@ -165,88 +215,91 @@ const InstitutionPortal = () => {
                   </tr>
                 </thead>
                 <tbody className="divide-y">
-                  {[
-                    { exam: "Biology", score: "50", credits: "3", equiv: "BIO 101", complete: true },
-                    { exam: "Chemistry", score: "50", credits: "3", equiv: "CHEM 101", complete: true },
-                    { exam: "College Algebra", score: "50", credits: "3", equiv: "MATH 110", complete: true },
-                    { exam: "English Composition", score: "-", credits: "-", equiv: "-", complete: false },
-                    { exam: "History of US I", score: "50", credits: "3", equiv: "HIST 201", complete: true },
-                  ].map((row, i) => (
-                    <tr key={i} className="hover:bg-muted/50 transition-smooth">
-                      <td className="py-4 font-medium">{row.exam}</td>
-                      <td className="py-4">{row.score}</td>
-                      <td className="py-4">{row.credits}</td>
-                      <td className="py-4">{row.equiv}</td>
-                      <td className="py-4">
-                        {row.complete ? (
-                          <Badge variant="default" className="gap-1">
-                            <CheckCircle2 className="h-3 w-3" />
-                            Complete
-                          </Badge>
-                        ) : (
-                          <Badge variant="destructive" className="gap-1">
-                            <AlertCircle className="h-3 w-3" />
-                            Missing
-                          </Badge>
-                        )}
-                      </td>
-                      <td className="py-4">
-                        <Dialog>
-                          <DialogTrigger asChild>
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => setSelectedExam(row.exam)}
-                            >
-                              <Eye className="h-4 w-4 mr-2" />
-                              View Details
-                            </Button>
-                          </DialogTrigger>
-                          <DialogContent className="max-w-2xl">
-                            <DialogHeader>
-                              <DialogTitle>{examDetails.fullName}</DialogTitle>
-                              <DialogDescription>
-                                {examDetails.description}
-                              </DialogDescription>
-                            </DialogHeader>
-                            <div className="space-y-4 py-4">
-                              <div className="grid grid-cols-2 gap-4">
-                                <div>
-                                  <p className="text-sm text-muted-foreground">Minimum Score</p>
-                                  <p className="text-2xl font-bold">{examDetails.currentMinScore}</p>
+                  {institutionExamData.slice(0, 20).map((exam, i) => {
+                    const isComplete = exam.minScore && exam.minScore !== "";
+                    return (
+                      <tr key={i} className="hover:bg-muted/50 transition-smooth">
+                        <td className="py-4 font-medium">{exam.examName}</td>
+                        <td className="py-4">{exam.minScore || "-"}</td>
+                        <td className="py-4">{exam.credits || "-"}</td>
+                        <td className="py-4">{exam.courseCode || "-"}</td>
+                        <td className="py-4">
+                          {isComplete ? (
+                            <Badge variant="default" className="gap-1">
+                              <CheckCircle2 className="h-3 w-3" />
+                              Complete
+                            </Badge>
+                          ) : (
+                            <Badge variant="destructive" className="gap-1">
+                              <AlertCircle className="h-3 w-3" />
+                              Missing
+                            </Badge>
+                          )}
+                        </td>
+                        <td className="py-4">
+                          <Dialog>
+                            <DialogTrigger asChild>
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => setSelectedExam(exam)}
+                                >
+                                  <Eye className="h-4 w-4 mr-2" />
+                                  View Details
+                                </Button>
+                              </DialogTrigger>
+                            <DialogContent className="max-w-2xl">
+                              <DialogHeader>
+                                <DialogTitle>{exam.examName}</DialogTitle>
+                                <DialogDescription>
+                                  CLEP exam acceptance policy details
+                                </DialogDescription>
+                              </DialogHeader>
+                              <div className="space-y-4 py-4">
+                                <div className="grid grid-cols-2 gap-4">
+                                  <div>
+                                    <p className="text-sm text-muted-foreground">Minimum Score</p>
+                                    <p className="text-2xl font-bold">{exam.minScore || "Not set"}</p>
+                                  </div>
+                                  <div>
+                                    <p className="text-sm text-muted-foreground">Credits Awarded</p>
+                                    <p className="text-2xl font-bold">{exam.credits || "Not set"}</p>
+                                  </div>
                                 </div>
                                 <div>
-                                  <p className="text-sm text-muted-foreground">Credits Awarded</p>
-                                  <p className="text-2xl font-bold">{examDetails.currentCredits}</p>
+                                  <p className="text-sm text-muted-foreground">Course Equivalency</p>
+                                  <p className="text-lg font-semibold">{exam.courseCode || "Not set"}</p>
                                 </div>
+                                <div>
+                                  <p className="text-sm text-muted-foreground">Last Updated</p>
+                                  <p className="text-sm">
+                                    {exam.lastUpdated === "Never" 
+                                      ? "Never" 
+                                      : new Date(exam.lastUpdated).toLocaleDateString()}
+                                  </p>
+                                </div>
+                                {exam.category && (
+                                  <div>
+                                    <p className="text-sm text-muted-foreground">Category</p>
+                                    <p className="text-sm">{exam.category}</p>
+                                  </div>
+                                )}
                               </div>
-                              <div>
-                                <p className="text-sm text-muted-foreground">Course Equivalency</p>
-                                <p className="text-lg font-semibold">{examDetails.currentEquiv}</p>
+                              <div className="flex justify-end gap-2">
+                                <Button
+                                  variant="outline"
+                                  onClick={() => navigate("/institution/data-management")}
+                                >
+                                  <Edit className="h-4 w-4 mr-2" />
+                                  Edit Details
+                                </Button>
                               </div>
-                              <div>
-                                <p className="text-sm text-muted-foreground">Last Updated</p>
-                                <p className="text-sm">{examDetails.lastUpdated}</p>
-                              </div>
-                              <div>
-                                <p className="text-sm text-muted-foreground">Notes</p>
-                                <p className="text-sm">{examDetails.notes}</p>
-                              </div>
-                            </div>
-                            <div className="flex justify-end gap-2">
-                              <Button
-                                variant="outline"
-                                onClick={() => navigate("/institution/data-management")}
-                              >
-                                <Edit className="h-4 w-4 mr-2" />
-                                Edit Details
-                              </Button>
-                            </div>
-                          </DialogContent>
-                        </Dialog>
-                      </td>
-                    </tr>
-                  ))}
+                            </DialogContent>
+                          </Dialog>
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { Navigation } from "@/components/Navigation";
 import { Sidebar } from "@/components/Sidebar";
 import { Card } from "@/components/ui/card";
@@ -8,6 +8,15 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { CheckCircle2, AlertCircle, Download, Upload, Save, RotateCcw } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/contexts/AuthContext";
+import { getUniversityByDiCode } from "@/lib/universityDatabase";
+import {
+  getInstitutionExamData,
+  initializeDefaultExamData,
+  updateInstitutionExam,
+  saveInstitutionExamData,
+  type InstitutionExamData,
+} from "@/lib/institutionDataStorage";
 
 interface ExamData {
   id: string;
@@ -21,18 +30,60 @@ interface ExamData {
 
 const InstitutionDataManagement = () => {
   const { toast } = useToast();
+  const { user } = useAuth();
   const [selectedExams, setSelectedExams] = useState<string[]>([]);
-  const [examData, setExamData] = useState<ExamData[]>([
-    { id: "1", name: "American Government", minScore: "50", credits: "3", courseCode: "POLS 101", lastUpdated: "2024-01-15", category: "Social Sciences" },
-    { id: "2", name: "Biology", minScore: "50", credits: "3", courseCode: "BIO 101", lastUpdated: "2024-02-20", category: "Natural Sciences" },
-    { id: "3", name: "Chemistry", minScore: "50", credits: "3", courseCode: "CHEM 101", lastUpdated: "2024-02-20", category: "Natural Sciences" },
-    { id: "4", name: "College Algebra", minScore: "50", credits: "3", courseCode: "MATH 110", lastUpdated: "2024-03-10", category: "Mathematics" },
-    { id: "5", name: "English Composition", minScore: "", credits: "", courseCode: "", lastUpdated: "Never", category: "Composition" },
-    { id: "6", name: "History of US I", minScore: "50", credits: "3", courseCode: "HIST 201", lastUpdated: "2024-01-15", category: "History" },
-  ]);
-
-  const [editingCell, setEditingCell] = useState<{ examId: string; field: string } | null>(null);
   const [hasChanges, setHasChanges] = useState(false);
+  const [originalData, setOriginalData] = useState<ExamData[]>([]);
+
+  // Get the university data for the logged-in institution
+  const university = useMemo(() => {
+    if (!user?.institution?.diCode) return null;
+    return getUniversityByDiCode(user.institution.diCode);
+  }, [user]);
+
+  // Load real exam data from database and localStorage
+  const [examData, setExamData] = useState<ExamData[]>([]);
+
+  useEffect(() => {
+    if (!user?.institution?.id) return;
+
+    const institutionId = user.institution.id;
+    initializeDefaultExamData(institutionId);
+    const storedData = getInstitutionExamData(institutionId);
+
+    // Merge with university database data (prioritize stored data, fallback to database)
+    let mergedData: ExamData[] = [];
+    
+    if (university) {
+      mergedData = university.clepPolicies.map((policy, index) => {
+        const stored = storedData.find(
+          (e) => e.examName.toLowerCase() === policy.examName.toLowerCase()
+        );
+        return {
+          id: `exam-${index}`,
+          name: policy.examName,
+          minScore: stored?.minScore?.toString() || (policy.minimumScore?.toString() || ""),
+          credits: stored?.credits?.toString() || (policy.creditsAwarded?.toString() || ""),
+          courseCode: stored?.courseCode || (policy.classEquivalent?.toString() || ""),
+          lastUpdated: stored?.lastUpdated || "Never",
+          category: stored?.category || "General",
+        };
+      });
+    } else {
+      mergedData = storedData.map((exam, index) => ({
+        id: `exam-${index}`,
+        name: exam.examName,
+        minScore: exam.minScore?.toString() || "",
+        credits: exam.credits?.toString() || "",
+        courseCode: exam.courseCode || "",
+        lastUpdated: exam.lastUpdated || "Never",
+        category: exam.category || "General",
+      }));
+    }
+
+    setExamData(mergedData);
+    setOriginalData(JSON.parse(JSON.stringify(mergedData))); // Deep copy
+  }, [user, university]);
 
   const handleCellEdit = (examId: string, field: keyof ExamData, value: string) => {
     setExamData((prev) =>
@@ -44,20 +95,96 @@ const InstitutionDataManagement = () => {
   };
 
   const handleSave = () => {
-    toast({
-      title: "Changes saved!",
-      description: "Your CLEP data has been updated successfully.",
+    if (!user?.institution?.id) {
+      toast({
+        title: "Error",
+        description: "You must be logged in to save changes.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const institutionId = user.institution.id;
+    const errors: string[] = [];
+
+    // Save each exam that has been modified
+    examData.forEach((exam) => {
+      const original = originalData.find((o) => o.id === exam.id);
+      if (!original) return;
+
+      // Check if this exam has changed
+      const hasChanged =
+        exam.minScore !== original.minScore ||
+        exam.credits !== original.credits ||
+        exam.courseCode !== original.courseCode;
+
+      if (hasChanged) {
+        const updates: Partial<InstitutionExamData> = {};
+        if (exam.minScore !== original.minScore) {
+          updates.minScore = exam.minScore;
+        }
+        if (exam.credits !== original.credits) {
+          updates.credits = exam.credits;
+        }
+        if (exam.courseCode !== original.courseCode) {
+          updates.courseCode = exam.courseCode;
+        }
+        updates.lastUpdated = new Date().toISOString().split("T")[0];
+
+        const success = updateInstitutionExam(institutionId, exam.name, updates);
+        if (!success) {
+          errors.push(exam.name);
+        }
+      }
     });
+
+    if (errors.length > 0) {
+      toast({
+        title: "Partial Save",
+        description: `Saved most changes, but ${errors.length} exam(s) failed to save.`,
+        variant: "destructive",
+      });
+    } else {
+      toast({
+        title: "Changes saved!",
+        description: "Your CLEP data has been updated successfully.",
+      });
+    }
+
+    // Reload data to reflect saved changes
+    const storedData = getInstitutionExamData(institutionId);
+    let mergedData: ExamData[] = [];
+    
+    if (university) {
+      mergedData = university.clepPolicies.map((policy, index) => {
+        const stored = storedData.find(
+          (e) => e.examName.toLowerCase() === policy.examName.toLowerCase()
+        );
+        return {
+          id: `exam-${index}`,
+          name: policy.examName,
+          minScore: stored?.minScore?.toString() || (policy.minimumScore?.toString() || ""),
+          credits: stored?.credits?.toString() || (policy.creditsAwarded?.toString() || ""),
+          courseCode: stored?.courseCode || (policy.classEquivalent?.toString() || ""),
+          lastUpdated: stored?.lastUpdated || "Never",
+          category: stored?.category || "General",
+        };
+      });
+    }
+
+    setExamData(mergedData);
+    setOriginalData(JSON.parse(JSON.stringify(mergedData)));
     setHasChanges(false);
     setSelectedExams([]);
   };
 
   const handleReset = () => {
+    setExamData(JSON.parse(JSON.stringify(originalData))); // Reset to original
+    setHasChanges(false);
     toast({
       title: "Changes discarded",
       description: "All unsaved changes have been reset.",
     });
-    setHasChanges(false);
   };
 
   const handleExport = () => {
@@ -81,8 +208,33 @@ const InstitutionDataManagement = () => {
     );
   };
 
-  const completedCount = examData.filter((e) => e.minScore).length;
-  const totalCount = examData.length;
+  // Calculate statistics
+  const stats = useMemo(() => {
+    const totalCount = examData.length;
+    const completedCount = examData.filter((e) => e.minScore && e.minScore !== "").length;
+    
+    // Calculate average minimum score
+    const scores = examData
+      .map((e) => parseInt(e.minScore))
+      .filter((s) => !isNaN(s) && s > 0);
+    const avgScore = scores.length > 0
+      ? Math.round(scores.reduce((sum, s) => sum + s, 0) / scores.length)
+      : 0;
+
+    // Find most recent update
+    const dates = examData
+      .map((e) => e.lastUpdated)
+      .filter((d) => d !== "Never")
+      .sort((a, b) => new Date(b).getTime() - new Date(a).getTime());
+    const lastUpdated = dates.length > 0 ? dates[0] : "Never";
+
+    return {
+      totalCount,
+      completedCount,
+      avgScore,
+      lastUpdated,
+    };
+  }, [examData]);
 
   return (
     <div className="min-h-screen bg-background">
@@ -103,19 +255,23 @@ const InstitutionDataManagement = () => {
           <div className="grid md:grid-cols-4 gap-6 mb-8">
             <Card className="p-6 shadow-card hover-lift">
               <div className="text-sm text-muted-foreground mb-1">Total Exams Tracked</div>
-              <div className="text-3xl font-bold">{totalCount}</div>
+              <div className="text-3xl font-bold">{stats.totalCount}</div>
             </Card>
             <Card className="p-6 shadow-card hover-lift">
               <div className="text-sm text-muted-foreground mb-1">Accepting Credit</div>
-              <div className="text-3xl font-bold text-primary">{completedCount}</div>
+              <div className="text-3xl font-bold text-primary">{stats.completedCount}</div>
             </Card>
             <Card className="p-6 shadow-card hover-lift">
               <div className="text-sm text-muted-foreground mb-1">Average Min Score</div>
-              <div className="text-3xl font-bold">50</div>
+              <div className="text-3xl font-bold">{stats.avgScore || "N/A"}</div>
             </Card>
             <Card className="p-6 shadow-card hover-lift">
               <div className="text-sm text-muted-foreground mb-1">Last Update</div>
-              <div className="text-lg font-semibold mt-2">March 10, 2024</div>
+              <div className="text-lg font-semibold mt-2">
+                {stats.lastUpdated === "Never"
+                  ? "Never"
+                  : new Date(stats.lastUpdated).toLocaleDateString()}
+              </div>
             </Card>
           </div>
 
@@ -223,7 +379,11 @@ const InstitutionDataManagement = () => {
                               placeholder="--"
                             />
                           </td>
-                          <td className="py-4 text-sm text-muted-foreground">{exam.lastUpdated}</td>
+                          <td className="py-4 text-sm text-muted-foreground">
+                            {exam.lastUpdated === "Never"
+                              ? "Never"
+                              : new Date(exam.lastUpdated).toLocaleDateString()}
+                          </td>
                           <td className="py-4">
                             {exam.minScore ? (
                               <Badge variant="default" className="gap-1">
@@ -245,15 +405,211 @@ const InstitutionDataManagement = () => {
               </TabsContent>
 
               <TabsContent value="recent">
-                <p className="text-muted-foreground text-center py-8">
-                  Showing exams updated in the last 30 days
-                </p>
+                <div className="overflow-x-auto">
+                  <table className="w-full">
+                    <thead className="border-b">
+                      <tr className="text-left">
+                        <th className="pb-3 font-semibold w-12">
+                          <input
+                            type="checkbox"
+                            checked={selectedExams.length === examData.filter(e => {
+                              if (e.lastUpdated === "Never") return false;
+                              const date = new Date(e.lastUpdated);
+                              const thirtyDaysAgo = new Date();
+                              thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+                              return date >= thirtyDaysAgo;
+                            }).length}
+                            onChange={() => {
+                              const recentExams = examData.filter(e => {
+                                if (e.lastUpdated === "Never") return false;
+                                const date = new Date(e.lastUpdated);
+                                const thirtyDaysAgo = new Date();
+                                thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+                                return date >= thirtyDaysAgo;
+                              });
+                              if (selectedExams.length === recentExams.length) {
+                                setSelectedExams([]);
+                              } else {
+                                setSelectedExams(recentExams.map(e => e.id));
+                              }
+                            }}
+                            className="rounded"
+                          />
+                        </th>
+                        <th className="pb-3 font-semibold">Exam Name</th>
+                        <th className="pb-3 font-semibold">Category</th>
+                        <th className="pb-3 font-semibold">Min Score</th>
+                        <th className="pb-3 font-semibold">Credits</th>
+                        <th className="pb-3 font-semibold">Course Code</th>
+                        <th className="pb-3 font-semibold">Last Updated</th>
+                        <th className="pb-3 font-semibold">Status</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y">
+                      {examData
+                        .filter((exam) => {
+                          if (exam.lastUpdated === "Never") return false;
+                          const date = new Date(exam.lastUpdated);
+                          const thirtyDaysAgo = new Date();
+                          thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+                          return date >= thirtyDaysAgo;
+                        })
+                        .map((exam) => (
+                          <tr key={exam.id} className="hover:bg-muted/50 transition-smooth">
+                            <td className="py-4">
+                              <input
+                                type="checkbox"
+                                checked={selectedExams.includes(exam.id)}
+                                onChange={() => toggleSelect(exam.id)}
+                                className="rounded"
+                              />
+                            </td>
+                            <td className="py-4 font-medium">{exam.name}</td>
+                            <td className="py-4">
+                              <Badge variant="outline">{exam.category}</Badge>
+                            </td>
+                            <td className="py-4">
+                              <Input
+                                value={exam.minScore}
+                                onChange={(e) => handleCellEdit(exam.id, "minScore", e.target.value)}
+                                className="w-20 h-8"
+                                placeholder="--"
+                              />
+                            </td>
+                            <td className="py-4">
+                              <Input
+                                value={exam.credits}
+                                onChange={(e) => handleCellEdit(exam.id, "credits", e.target.value)}
+                                className="w-20 h-8"
+                                placeholder="--"
+                              />
+                            </td>
+                            <td className="py-4">
+                              <Input
+                                value={exam.courseCode}
+                                onChange={(e) => handleCellEdit(exam.id, "courseCode", e.target.value)}
+                                className="w-32 h-8"
+                                placeholder="--"
+                              />
+                            </td>
+                            <td className="py-4 text-sm text-muted-foreground">
+                              {exam.lastUpdated === "Never"
+                                ? "Never"
+                                : new Date(exam.lastUpdated).toLocaleDateString()}
+                            </td>
+                            <td className="py-4">
+                              {exam.minScore ? (
+                                <Badge variant="default" className="gap-1">
+                                  <CheckCircle2 className="h-3 w-3" />
+                                  Complete
+                                </Badge>
+                              ) : (
+                                <Badge variant="destructive" className="gap-1">
+                                  <AlertCircle className="h-3 w-3" />
+                                  Missing
+                                </Badge>
+                              )}
+                            </td>
+                          </tr>
+                        ))}
+                    </tbody>
+                  </table>
+                </div>
               </TabsContent>
 
               <TabsContent value="needs-review">
-                <p className="text-muted-foreground text-center py-8">
-                  Showing exams with missing or incomplete data
-                </p>
+                <div className="overflow-x-auto">
+                  <table className="w-full">
+                    <thead className="border-b">
+                      <tr className="text-left">
+                        <th className="pb-3 font-semibold w-12">
+                          <input
+                            type="checkbox"
+                            checked={selectedExams.length === examData.filter(e => !e.minScore || e.minScore === "").length}
+                            onChange={() => {
+                              const needsReview = examData.filter(e => !e.minScore || e.minScore === "");
+                              if (selectedExams.length === needsReview.length) {
+                                setSelectedExams([]);
+                              } else {
+                                setSelectedExams(needsReview.map(e => e.id));
+                              }
+                            }}
+                            className="rounded"
+                          />
+                        </th>
+                        <th className="pb-3 font-semibold">Exam Name</th>
+                        <th className="pb-3 font-semibold">Category</th>
+                        <th className="pb-3 font-semibold">Min Score</th>
+                        <th className="pb-3 font-semibold">Credits</th>
+                        <th className="pb-3 font-semibold">Course Code</th>
+                        <th className="pb-3 font-semibold">Last Updated</th>
+                        <th className="pb-3 font-semibold">Status</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y">
+                      {examData
+                        .filter((exam) => !exam.minScore || exam.minScore === "")
+                        .map((exam) => (
+                          <tr key={exam.id} className="hover:bg-muted/50 transition-smooth">
+                            <td className="py-4">
+                              <input
+                                type="checkbox"
+                                checked={selectedExams.includes(exam.id)}
+                                onChange={() => toggleSelect(exam.id)}
+                                className="rounded"
+                              />
+                            </td>
+                            <td className="py-4 font-medium">{exam.name}</td>
+                            <td className="py-4">
+                              <Badge variant="outline">{exam.category}</Badge>
+                            </td>
+                            <td className="py-4">
+                              <Input
+                                value={exam.minScore}
+                                onChange={(e) => handleCellEdit(exam.id, "minScore", e.target.value)}
+                                className="w-20 h-8"
+                                placeholder="--"
+                              />
+                            </td>
+                            <td className="py-4">
+                              <Input
+                                value={exam.credits}
+                                onChange={(e) => handleCellEdit(exam.id, "credits", e.target.value)}
+                                className="w-20 h-8"
+                                placeholder="--"
+                              />
+                            </td>
+                            <td className="py-4">
+                              <Input
+                                value={exam.courseCode}
+                                onChange={(e) => handleCellEdit(exam.id, "courseCode", e.target.value)}
+                                className="w-32 h-8"
+                                placeholder="--"
+                              />
+                            </td>
+                            <td className="py-4 text-sm text-muted-foreground">
+                              {exam.lastUpdated === "Never"
+                                ? "Never"
+                                : new Date(exam.lastUpdated).toLocaleDateString()}
+                            </td>
+                            <td className="py-4">
+                              {exam.minScore ? (
+                                <Badge variant="default" className="gap-1">
+                                  <CheckCircle2 className="h-3 w-3" />
+                                  Complete
+                                </Badge>
+                              ) : (
+                                <Badge variant="destructive" className="gap-1">
+                                  <AlertCircle className="h-3 w-3" />
+                                  Missing
+                                </Badge>
+                              )}
+                            </td>
+                          </tr>
+                        ))}
+                    </tbody>
+                  </table>
+                </div>
               </TabsContent>
             </Tabs>
           </Card>

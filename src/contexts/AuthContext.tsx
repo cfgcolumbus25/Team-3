@@ -1,14 +1,13 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
-import institutionsData from "@/data/institutions.json";
-import usersData from "@/data/users.json";
+import { getUniversityByDiCode, type University } from "@/lib/universityDatabase";
 
 interface Institution {
   id: number;
   name: string;
   city: string;
   state: string;
-  diCode: string;
+  diCode: number; // Changed to number to match University type
 }
 
 interface User {
@@ -20,7 +19,7 @@ interface User {
 
 interface AuthContextType {
   user: User | null;
-  login: (email: string, password: string, role: "admin" | "institution", institutionId?: number) => boolean;
+  login: (email: string, password: string, role: "admin" | "institution", institutionDiCode?: number) => boolean;
   logout: () => void;
   isLoading: boolean;
 }
@@ -40,7 +39,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setIsLoading(false);
   }, []);
 
-  const login = (email: string, password: string, role: "admin" | "institution", institutionId?: number): boolean => {
+  const login = (email: string, password: string, role: "admin" | "institution", institutionDiCode?: number): boolean => {
     // Accept any non-empty credentials
     if (!email.trim() || !password.trim()) {
       return false;
@@ -53,9 +52,20 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       navigate("/admin");
       return true;
     } else {
-      if (!institutionId) return false;
-      const institution = institutionsData.find((i) => i.id === institutionId);
-      if (institution) {
+      if (!institutionDiCode) return false;
+      
+      // Find university by DI code from the full database (all 57 institutions)
+      const university = getUniversityByDiCode(institutionDiCode);
+      if (university) {
+        // Convert University to Institution format for compatibility
+        const institution: Institution = {
+          id: university.id,
+          name: university.name,
+          city: university.city,
+          state: university.state,
+          diCode: university.diCode,
+        };
+        
         const userData = { email, role: "institution" as const, institution };
         setUser(userData);
         localStorage.setItem("user", JSON.stringify(userData));

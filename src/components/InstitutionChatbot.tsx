@@ -5,8 +5,8 @@ import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
-
-//const [pendingActions, setPendingActions] = useState<any[] | null>(null);
+import { useAuth } from "@/contexts/AuthContext";
+import type { UpdateAction } from "@/pages/api/update-college-intent";
 
 interface Message {
   id: string;
@@ -22,12 +22,13 @@ interface InstitutionChatbotProps {
 }
 
 export const InstitutionChatbot = ({ open, onOpenChange }: InstitutionChatbotProps) => {
-  const [pendingActions, setPendingActions] = useState<any[] | null>(null);
+  const [pendingActions, setPendingActions] = useState<UpdateAction[] | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
+  const { user } = useAuth();
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -162,16 +163,23 @@ export const InstitutionChatbot = ({ open, onOpenChange }: InstitutionChatbotPro
     if (pendingActions) {
       const answer = messageText.toLowerCase();
 
-      if (answer.includes("yes")) {
+      if (answer.includes("yes") || answer.includes("confirm") || answer.includes("apply")) {
         // User confirmed -> commit updates
         try {
-          const res = await fetch("/api/confirm-update", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ actions: pendingActions })
-          });
+          const institutionId = user?.institution?.id;
+          if (!institutionId) {
+            setMessages(prev => [...prev, {
+              id: (Date.now() + 1).toString(),
+              text: "❌ Error: You must be logged in as an institution to update data.",
+              sender: "ai",
+              timestamp: new Date()
+            }]);
+            setIsLoading(false);
+            return;
+          }
 
-          const data = await res.json();
+          const { handleConfirmUpdate } = await import("@/pages/api/confirm-update");
+          const data = await handleConfirmUpdate(pendingActions, institutionId);
 
           const aiMessage: Message = {
             id: (Date.now() + 1).toString(),
@@ -185,9 +193,10 @@ export const InstitutionChatbot = ({ open, onOpenChange }: InstitutionChatbotPro
           setIsLoading(false);
           return;
         } catch (err) {
+          console.error("Confirm update error:", err);
           setMessages(prev => [...prev, {
             id: (Date.now() + 1).toString(),
-            text: "❌ Failed to update.",
+            text: "❌ Failed to update. Please try again.",
             sender: "ai",
             timestamp: new Date()
           }]);
@@ -196,11 +205,11 @@ export const InstitutionChatbot = ({ open, onOpenChange }: InstitutionChatbotPro
         }
       }
 
-      if (answer.includes("no")) {
+      if (answer.includes("no") || answer.includes("cancel") || answer.includes("abort")) {
         // Cancel update
         setMessages(prev => [...prev, {
           id: (Date.now() + 1).toString(),
-          text: "Okay, I cancelled the update.",
+          text: "Okay, I cancelled the update. What would you like to do instead?",
           sender: "ai",
           timestamp: new Date()
         }]);
@@ -210,15 +219,42 @@ export const InstitutionChatbot = ({ open, onOpenChange }: InstitutionChatbotPro
       }
     }
 
-    // Normal processing: detect update intent
-    try {
-      const res = await fetch("/api/update-college-intent", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message: messageText })
-      });
+    // Normal processing: check if it's an informational query or update command
+    const lowerMessage = messageText.toLowerCase();
+    const isUpdateCommand = 
+      lowerMessage.includes("set") || 
+      lowerMessage.includes("change") || 
+      lowerMessage.includes("update") || 
+      lowerMessage.includes("modify") ||
+      lowerMessage.includes("edit") ||
+      (lowerMessage.includes("to") && (lowerMessage.includes("score") || lowerMessage.includes("credit") || lowerMessage.includes("course")));
 
-      const data = await res.json();
+    // Handle informational queries first
+    if (!isUpdateCommand) {
+      try {
+        const institutionId = user?.institution?.id || 0;
+        const { handleInformationalQuery } = await import("@/pages/api/institution-chat");
+        const reply = handleInformationalQuery(messageText, institutionId);
+
+        const aiMessage: Message = {
+          id: (Date.now() + 1).toString(),
+          text: reply,
+          sender: "ai",
+          timestamp: new Date(),
+        };
+
+        setMessages(prev => [...prev, aiMessage]);
+        setIsLoading(false);
+        return;
+      } catch (error) {
+        console.error("Informational query error:", error);
+      }
+    }
+
+    // Handle update commands
+    try {
+      const { handleUpdateIntent } = await import("@/pages/api/update-college-intent");
+      const data = await handleUpdateIntent(messageText);
 
       const aiMessage: Message = {
         id: (Date.now() + 1).toString(),
@@ -230,14 +266,15 @@ export const InstitutionChatbot = ({ open, onOpenChange }: InstitutionChatbotPro
       setMessages(prev => [...prev, aiMessage]);
 
       // If Claude returned actions, save them
-      if (data.actions) {
+      if (data.actions && data.actions.length > 0) {
         setPendingActions(data.actions);
       }
 
     } catch (error) {
+      console.error("Update intent error:", error);
       setMessages(prev => [...prev, {
         id: (Date.now() + 1).toString(),
-        text: "Sorry, something went wrong.",
+        text: "Sorry, something went wrong. Please try again or rephrase your request.",
         sender: "ai",
         timestamp: new Date()
       }]);

@@ -1,13 +1,15 @@
-import { useState } from "react";
+import { useState, useEffect, useMemo } from "react";
+import { useSearchParams } from "react-router-dom";
 import { Eye, EyeOff, Search, CheckCircle2, Clock, Brain } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Dropdown } from "@/components/ui/dropdown";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
-import institutionsData from "@/data/institutions.json";
+import { getAllUniversities, type University } from "@/lib/universityDatabase";
 
 const InstitutionLogin = () => {
+  const [searchParams] = useSearchParams();
   const [selectedInstitution, setSelectedInstitution] = useState<number | undefined>();
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -15,11 +17,33 @@ const InstitutionLogin = () => {
   const { login } = useAuth();
   const { toast } = useToast();
 
-  const institutionOptions = institutionsData.map((inst) => ({
-    value: inst.id,
-    label: inst.name,
-    sublabel: `${inst.city}, ${inst.state} • DI: ${inst.diCode}`,
-  }));
+  // Get all 57 universities from the database
+  const allUniversities = useMemo(() => getAllUniversities(), []);
+
+  // Create institution options from all universities (using DI code as value)
+  const institutionOptions = useMemo(() => 
+    allUniversities.map((uni) => ({
+      value: uni.diCode, // Use DI code as the identifier
+      label: uni.name,
+      sublabel: `${uni.city}, ${uni.state} • DI: ${uni.diCode}`,
+    })).sort((a, b) => a.label.localeCompare(b.label)), // Sort alphabetically
+    [allUniversities]
+  );
+
+  // Check for diCode in URL params (from learner portal click)
+  useEffect(() => {
+    const diCodeParam = searchParams.get("diCode");
+    if (diCodeParam) {
+      const university = allUniversities.find(u => u.diCode.toString() === diCodeParam);
+      if (university) {
+        setSelectedInstitution(university.diCode);
+        toast({
+          title: "Institution Found",
+          description: `Found ${university.name}. Enter password to continue.`,
+        });
+      }
+    }
+  }, [searchParams, allUniversities, toast]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -46,8 +70,26 @@ const InstitutionLogin = () => {
 
     // Simulate API call
     setTimeout(() => {
-      const institution = institutionsData.find((i) => i.id === selectedInstitution);
-      const success = login(`admin@${institution?.name.toLowerCase().replace(/[^a-z]/g, '')}.edu`, password, "institution", selectedInstitution);
+      // Find university by DI code (which is now the selected value)
+      const university = allUniversities.find((u) => u.diCode === selectedInstitution);
+      
+      if (!university) {
+        setIsLoading(false);
+        toast({
+          title: "Error",
+          description: "Institution not found",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      // Login with the university's DI code
+      const success = login(
+        `admin@${university.name.toLowerCase().replace(/[^a-z0-9]/g, '')}.edu`,
+        password,
+        "institution",
+        university.diCode
+      );
       
       setIsLoading(false);
 
@@ -115,7 +157,7 @@ const InstitutionLogin = () => {
         </div>
 
         <div className="text-xs text-muted-foreground">
-          © 2024 Modern States. All rights reserved.
+          © 2025 Modern States. All rights reserved.
         </div>
       </div>
 
@@ -143,7 +185,7 @@ const InstitutionLogin = () => {
                   searchable
                 />
                 <p className="text-xs text-muted-foreground">
-                  Can't find your institution? Contact support
+                  Showing {institutionOptions.length} institutions. Can't find yours? Contact support
                 </p>
               </div>
 
