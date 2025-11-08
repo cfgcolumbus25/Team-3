@@ -53,8 +53,20 @@ export default function AdminPortal() {
   const [editingId, setEditingId] = useState<number | null>(null);
   const [search, setSearch] = useState("");
 
-  const handleSendEmail = (id: number) => {
+  const handleSendEmail = async (id: number) => {
     setAlerts(alerts.map(a => a.id === id ? { ...a, status: "sent" } : a));
+
+    try {
+      await fetch("/api/sendEmail", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({ alertId: id })
+      });
+    } catch (err) {
+      console.error("Error sending email:", err);
+    }
   };
 
   const handleDismissAlert = (id: number) => {

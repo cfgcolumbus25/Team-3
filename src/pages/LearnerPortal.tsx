@@ -121,6 +121,7 @@ const LearnerPortal = () => {
       try {
         setLoading(true);
         const universities = await getAllUniversities();
+        console.log(universities)
         setAllUniversities(universities as College[]);
       } catch (error) {
         console.error("Error loading universities:", error);
@@ -900,7 +901,7 @@ const LearnerPortal = () => {
                   : "space-y-4"
               }
             >
-              {filteredColleges.map((college) => (
+              {filteredColleges.map((college: College) => (
                 <Card
                   key={college.id}
                   className={`p-4 hover-lift transition-all ${
@@ -1106,7 +1107,7 @@ const LearnerPortal = () => {
                           <Button 
                             size="sm" 
                             variant="outline" 
-                            className="flex-1 text-xs"
+                            className="flex-1 text-xs" 
                             onClick={() => window.open(`mailto:info@${college.url}`, '_blank')}
                           >
                             Contact
