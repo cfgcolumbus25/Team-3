@@ -483,7 +483,7 @@ const LearnerPortal = () => {
             <div className="space-y-3">
               <h4 className="font-medium text-sm">Location</h4>
               <select 
-                className="w-full h-10 px-3 rounded-lg bg-background border border-border focus:border-primary focus:outline-none"
+                className="w-full h-10 px-4 py-2 rounded-lg bg-background border border-border focus:border-primary focus:outline-none"
                 value={selectedState}
                 onChange={(e) => setSelectedState(e.target.value)}
               >
@@ -539,11 +539,20 @@ const LearnerPortal = () => {
                 <option value="WI">Wisconsin</option>
                 <option value="WY">Wyoming</option>
               </select>
-              <Input 
-                placeholder="Enter ZIP code" 
-                value={zipCode}
-                onChange={(e) => setZipCode(e.target.value)}
-              />
+              <div className="space-y-1">
+                <Input 
+                  placeholder="Enter ZIP code (required)" 
+                  value={zipCode}
+                  onChange={(e) => setZipCode(e.target.value)}
+                  required
+                  pattern="[0-9]{5}(-[0-9]{4})?"
+                  title="Please enter a valid 5-digit ZIP code (e.g., 12345 or 12345-6789)"
+                  className={!zipCode.trim() ? "border-destructive" : ""}
+                />
+                {!zipCode.trim() && (
+                  <p className="text-xs text-destructive">ZIP code is required</p>
+                )}
+              </div>
               <div className="space-y-2">
                 <label className="text-sm text-muted-foreground">Within miles</label>
                 <input
@@ -1019,13 +1028,27 @@ const LearnerPortal = () => {
               </div>
               
               <div className="border border-border rounded-lg overflow-hidden">
-                <div 
-                  id="google-maps-container"
-                  className="w-full h-[500px]"
-                  style={{ minHeight: '500px' }}
-                >
-                  <CollegeMap />
-                </div>
+                {zipCode.trim() ? (
+                  <div 
+                    id="google-maps-container"
+                    className="w-full h-[500px]"
+                    style={{ minHeight: '500px' }}
+                  >
+                    <CollegeMap zipCode={zipCode.trim()} distance={distance} />
+                  </div>
+                ) : (
+                  <div 
+                    className="w-full h-[500px] bg-muted/20 flex items-center justify-center"
+                    style={{ minHeight: '500px' }}
+                  >
+                    <div className="text-center space-y-2">
+                      <Map className="h-12 w-12 text-muted-foreground mx-auto opacity-50" />
+                      <p className="text-sm text-muted-foreground font-medium">
+                        Please enter a ZIP code to view colleges on the map
+                      </p>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           </div>
