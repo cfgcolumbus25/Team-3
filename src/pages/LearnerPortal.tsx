@@ -1,10 +1,17 @@
 import { useState, useRef, useEffect, useMemo } from "react";
-import { Send, Bot, User, ChevronLeft, ChevronRight, ChevronDown, ChevronUp, MapPin, Star, X, Grid3x3, List, Download, Trash2, Map } from "lucide-react";
+import { Send, Bot, User, ChevronLeft, ChevronRight, ChevronDown, ChevronUp, MapPin, Star, X, Grid3x3, List, Download, Trash2, Map, ThumbsUp, ThumbsDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { 
+  getAllUniversities, 
+  getAllExamNames, 
+  filterUniversities, 
+  getUniversityById,
+  type University 
+} from "@/lib/universityDatabase";
 
 interface Message {
   id: string;
@@ -13,30 +20,20 @@ interface Message {
   timestamp: Date;
 }
 
-interface College {
-  id: number;
-  name: string;
-  city: string;
-  state: string;
-  examsAccepted: number;
-  avgScore: number;
-  credits: string;
+// Use University type from database, but add highlighted for UI
+interface College extends University {
   highlighted?: boolean;
 }
-
-// Original colleges data
-const allColleges: College[] = [
-  { id: 1, name: "Ohio State University", city: "Columbus", state: "OH", examsAccepted: 28, avgScore: 52, credits: "3-4" },
-  { id: 2, name: "Penn State University", city: "University Park", state: "PA", examsAccepted: 25, avgScore: 50, credits: "3-6" },
-  { id: 3, name: "University of California, Berkeley", city: "Berkeley", state: "CA", examsAccepted: 22, avgScore: 55, credits: "3" },
-  { id: 4, name: "Texas A&M University", city: "College Station", state: "TX", examsAccepted: 30, avgScore: 50, credits: "3-4" },
-  { id: 5, name: "University of Michigan", city: "Ann Arbor", state: "MI", examsAccepted: 26, avgScore: 53, credits: "3-4" },
-  { id: 6, name: "University of Florida", city: "Gainesville", state: "FL", examsAccepted: 29, avgScore: 50, credits: "3-6" },
-];
 
 interface UserExamScore {
   exam: string;
   score: number | null;
+}
+
+interface ExamPolicyFeedback {
+  collegeId: number;
+  examName: string;
+  feedback: "up" | "down" | null;
 }
 
 const LearnerPortal = () => {
@@ -51,6 +48,7 @@ const LearnerPortal = () => {
   // add sort option state
   const [sortOption, setSortOption] = useState<"name" | "mostExams" | "lowestScore">("name");
   const [userExamScores, setUserExamScores] = useState<UserExamScore[]>([]);
+  const [examPolicyFeedback, setExamPolicyFeedback] = useState<ExamPolicyFeedback[]>([]);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const chatbotSectionRef = useRef<HTMLDivElement>(null);
 
@@ -59,8 +57,8 @@ const LearnerPortal = () => {
   const [zipCode, setZipCode] = useState<string>("");
   const [distance, setDistance] = useState<number>(100);
   const [institutionTypes, setInstitutionTypes] = useState<string[]>([]);
-  const [minScore, setMinScore] = useState<number>(50);
-  const [minCredits, setMinCredits] = useState<number>(3);
+  const [minScore, setMinScore] = useState<number>(0); // Default to 0 to show all universities
+  const [minCredits, setMinCredits] = useState<number>(0); // Default to 0 to show all universities
 
   // Scroll to top when component mounts to ensure chatbot is visible first
   useEffect(() => {
@@ -109,44 +107,27 @@ const LearnerPortal = () => {
     "Low score requirements",
   ];
 
-  // Filter + sort colleges based on filter state and selected sortOption
+  // Get all universities and exams from database
+  const allUniversities = useMemo(() => getAllUniversities(), []);
+  const availableExams = useMemo(() => getAllExamNames(), []);
+
+  // Filter colleges based on filter state using database
   const filteredColleges = useMemo(() => {
-    let results = allColleges.filter((college) => {
-      // State filter
-      if (selectedState && college.state !== selectedState) {
-        return false;
-      }
+    const examNames = userExamScores.map(e => e.exam);
+    
+    const filters = {
+      state: selectedState || undefined,
+      // Only apply filters if they're greater than 0 (default is 0 to show all universities)
+      minScore: minScore > 0 ? minScore : undefined,
+      minCredits: minCredits > 0 ? minCredits : undefined,
+      examNames: examNames.length > 0 ? examNames : undefined,
+      minExamsAccepted: examNames.length > 0 ? examNames.length : undefined,
+      // Pass user exam scores for score-based filtering
+      userExamScores: userExamScores.length > 0 ? userExamScores : undefined
+    };
 
-      // Score filter
-      if (college.avgScore < minScore) {
-        return false;
-      }
-
-      // Credits filter - check if college's credit range meets minimum
-      const creditMin = parseInt(college.credits.split("-")[0]);
-      if (creditMin < minCredits) {
-        return false;
-      }
-
-      // Exam filter - if exams are selected, check if college accepts enough exams
-      if (userExamScores.length > 0 && college.examsAccepted < userExamScores.length) {
-        return false;
-      }
-
-      return true;
-    });
-
-    // Sorting
-    if (sortOption === "name") {
-      results = results.slice().sort((a, b) => a.name.localeCompare(b.name));
-    } else if (sortOption === "lowestScore") {
-      results = results.slice().sort((a, b) => a.avgScore - b.avgScore);
-    } else if (sortOption === "mostExams") {
-      results = results.slice().sort((a, b) => b.examsAccepted - a.examsAccepted);
-    }
-
-    return results;
-  }, [selectedState, minScore, minCredits, userExamScores, sortOption]);
+    return filterUniversities(filters) as College[];
+  }, [selectedState, minScore, minCredits, userExamScores]);
 
   // Filter handler functions
   const handleInstitutionTypeToggle = (type: string) => {
@@ -161,8 +142,51 @@ const LearnerPortal = () => {
     setDistance(100);
     setInstitutionTypes([]);
     setUserExamScores([]);
-    setMinScore(50);
-    setMinCredits(3);
+    setMinScore(0);
+    setMinCredits(0);
+  };
+
+  // Get feedback for a specific exam policy
+  const getFeedback = (collegeId: number, examName: string): "up" | "down" | null => {
+    const feedback = examPolicyFeedback.find(
+      f => f.collegeId === collegeId && f.examName === examName
+    );
+    return feedback?.feedback || null;
+  };
+
+  // Get total feedback counts for an exam across all colleges
+  const getExamFeedbackCounts = (examName: string) => {
+    const examFeedback = examPolicyFeedback.filter(f => f.examName === examName);
+    const thumbsUp = examFeedback.filter(f => f.feedback === "up").length;
+    const thumbsDown = examFeedback.filter(f => f.feedback === "down").length;
+    return { thumbsUp, thumbsDown };
+  };
+
+  // Handle feedback click
+  const handleFeedbackClick = (collegeId: number, examName: string, feedbackType: "up" | "down") => {
+    setExamPolicyFeedback(prev => {
+      const existing = prev.find(
+        f => f.collegeId === collegeId && f.examName === examName
+      );
+      
+      if (existing) {
+        // If clicking the same feedback, remove it (toggle off)
+        if (existing.feedback === feedbackType) {
+          return prev.filter(
+            f => !(f.collegeId === collegeId && f.examName === examName)
+          );
+        }
+        // Otherwise, update the feedback
+        return prev.map(f =>
+          f.collegeId === collegeId && f.examName === examName
+            ? { ...f, feedback: feedbackType }
+            : f
+        );
+      } else {
+        // Add new feedback
+        return [...prev, { collegeId, examName, feedback: feedbackType }];
+      }
+    });
   };
 
   const getAIResponse = (userMessage: string): string => {
@@ -264,53 +288,20 @@ const LearnerPortal = () => {
     );
   };
 
-  const mockExamData = [
-    { exam: "Biology", accepted: true, minScore: 50, credits: 4, courseCode: "BIO 101" },
-    { exam: "Chemistry", accepted: true, minScore: 55, credits: 3, courseCode: "CHEM 101" },
-    { exam: "Calculus", accepted: false, minScore: null, credits: null, courseCode: null },
-    { exam: "American Government", accepted: true, minScore: 50, credits: 3, courseCode: "POL 101" },
-  ];
-
-  const availableExams = [
-    "American Government",
-    "History of the United States I",
-    "History of the United States II",
-    "Introductory Sociology",
-    "Social Sciences and History",
-    "Western Civilization I",
-    "Western Civilization II",
-    "College Composition",
-    "College Composition Modular",
-    "American Literature",
-    "Analyzing and Interpreting Literature",
-    "English Literature",
-    "Human Growth and Development",
-    "Introduction to Educational Psychology",
-    "Introductory Psychology",
-    "Principles of Macroeconomics",
-    "Principles of Microeconomics",
-    "Biology",
-    "Chemistry",
-    "Natural Sciences",
-    "Calculus",
-    "College Algebra",
-    "College Mathematics",
-    "Precalculus",
-    "French Language Level I",
-    "French Language Level II",
-    "German Language Level I",
-    "German Language Level II",
-    "Spanish Language Level I",
-    "Spanish Language Level II",
-    "Financial Accounting",
-    "Information Systems",
-    "Introductory Business Law",
-    "Principles of Management",
-    "Principles of Marketing",
-    "Spanish With Writing Level I",
-    "Spanish With Writing Level II",
-    "Humanities"
-  ];
+  // Get exam data for a specific university (used in expanded card view)
+  const getExamDataForUniversity = (universityId: number) => {
+    const university = getUniversityById(universityId);
+    if (!university) return [];
+    
+    // Return ALL exams (both accepted and not accepted) for complete view
+    return university.clepPolicies.map(p => ({
+      exam: p.examName,
+      accepted: p.minimumScore !== null,
+      minScore: p.minimumScore,
+      credits: p.creditsAwarded,
+      courseCode: p.classEquivalent
+    }));
+  };
 
   const handleExamToggle = (exam: string) => {
     const existingExam = userExamScores.find(e => e.exam === exam);
@@ -679,10 +670,10 @@ const LearnerPortal = () => {
             <div className="space-y-3">
               <h4 className="font-medium text-sm">Requirements</h4>
               <div className="space-y-2">
-                <label className="text-sm text-muted-foreground">Minimum Score: {minScore}</label>
+                <label className="text-sm text-muted-foreground">Minimum Score: {minScore === 0 ? "Any" : minScore}</label>
                 <input
                   type="range"
-                  min="20"
+                  min="0"
                   max="80"
                   value={minScore}
                   onChange={(e) => setMinScore(Number(e.target.value))}
@@ -690,7 +681,7 @@ const LearnerPortal = () => {
                 />
               </div>
               <div className="space-y-2">
-                <label className="text-sm text-muted-foreground">Minimum Credits: {minCredits}</label>
+                <label className="text-sm text-muted-foreground">Minimum Credits: {minCredits === 0 ? "Any" : minCredits}</label>
                 <input
                   type="range"
                   min="0"
@@ -821,15 +812,15 @@ const LearnerPortal = () => {
                     <div className="grid grid-cols-3 gap-2 text-xs">
                       <div>
                         <p className="text-muted-foreground">Exams</p>
-                        <p className="font-semibold">{college.examsAccepted}/34</p>
+                        <p className="font-semibold">{college.examsAccepted}/{availableExams.length}</p>
                       </div>
                       <div>
                         <p className="text-muted-foreground">Avg Score</p>
-                        <p className="font-semibold">{college.avgScore}</p>
+                        <p className="font-semibold">{college.avgScore || "N/A"}</p>
                       </div>
                       <div>
-                        <p className="text-muted-foreground">Credits</p>
-                        <p className="font-semibold">{college.credits}</p>
+                        <p className="text-muted-foreground">Max Credits</p>
+                        <p className="font-semibold">{college.maxCredits || "N/A"}</p>
                       </div>
                     </div>
 
@@ -841,39 +832,150 @@ const LearnerPortal = () => {
                     )}
 
                     {expandedCard === college.id && (
-                      <div className="border-t pt-3 space-y-2 animate-fade-in">
-                        <p className="text-xs font-semibold">CLEP Acceptance:</p>
-                        <div className="border rounded-lg overflow-hidden">
-                          <table className="w-full text-xs">
-                            <thead>
-                              <tr className="bg-accent/50">
-                                <th className="text-left p-2">Exam</th>
-                                <th className="text-left p-2">Score</th>
-                                <th className="text-left p-2">Credits</th>
-                              </tr>
-                            </thead>
-                            <tbody>
-                              {mockExamData.map((exam, idx) => (
-                                <tr key={idx} className="border-t">
-                                  <td className="p-2">{exam.exam}</td>
-                                  <td className="p-2">
-                                    {exam.accepted ? (
-                                      <span className="text-green-500">✓ {exam.minScore}</span>
-                                    ) : (
-                                      <span className="text-red-500">✗ N/A</span>
-                                    )}
-                                  </td>
-                                  <td className="p-2">{exam.credits || "-"}</td>
-                                </tr>
-                              ))}
-                            </tbody>
-                          </table>
+                      <div className="border-t pt-3 space-y-3 animate-fade-in">
+                        {/* University Details */}
+                        <div className="grid grid-cols-2 gap-2 text-xs">
+                          <div>
+                            <p className="text-muted-foreground">Location</p>
+                            <p className="font-semibold">{college.city}, {college.state} {college.zip}</p>
+                          </div>
+                          <div>
+                            <p className="text-muted-foreground">Enrollment</p>
+                            <p className="font-semibold">{college.enrollment.toLocaleString()}</p>
+                          </div>
+                          <div>
+                            <p className="text-muted-foreground">DI Code</p>
+                            <p className="font-semibold">{college.diCode}</p>
+                          </div>
+                          <div>
+                            <p className="text-muted-foreground">Max Credits</p>
+                            <p className="font-semibold">{college.maxCredits}</p>
+                          </div>
+                          <div>
+                            <p className="text-muted-foreground">Transcription Fee</p>
+                            <p className="font-semibold">${college.transcriptionFee}</p>
+                          </div>
+                          <div>
+                            <p className="text-muted-foreground">Score Validity</p>
+                            <p className="font-semibold">{college.scoreValidityYears} years</p>
+                          </div>
+                          <div>
+                            <p className="text-muted-foreground">Can Use For Failed Courses</p>
+                            <p className="font-semibold">{college.canUseForFailedCourses ? "Yes" : "No"}</p>
+                          </div>
+                          <div>
+                            <p className="text-muted-foreground">Enrolled Students Can Use CLEP</p>
+                            <p className="font-semibold">{college.canEnrolledStudentsUseCLEP ? "Yes" : "No"}</p>
+                          </div>
                         </div>
+
+                        {/* CLEP Exam Policies */}
+                        <div>
+                          <p className="text-xs font-semibold mb-2">CLEP Exam Policies ({college.examsAccepted} accepted):</p>
+                          <div className="border rounded-lg overflow-hidden max-h-64 overflow-y-auto">
+                            <table className="w-full text-xs">
+                              <thead className="bg-accent/50 sticky top-0">
+                                <tr>
+                                  <th className="text-left p-2">Exam</th>
+                                  <th className="text-left p-2">Min Score</th>
+                                  <th className="text-left p-2">Credits</th>
+                                  <th className="text-left p-2">Course Equivalent</th>
+                                  <th className="text-left p-2">Feedback</th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {getExamDataForUniversity(college.id).map((exam, idx) => {
+                                  const currentFeedback = getFeedback(college.id, exam.exam);
+                                  const feedbackCounts = getExamFeedbackCounts(exam.exam);
+                                  return (
+                                    <tr key={idx} className="border-t">
+                                      <td className="p-2">
+                                        <div className="flex flex-col gap-1">
+                                          <span className="font-medium">{exam.exam}</span>
+                                          {(feedbackCounts.thumbsUp > 0 || feedbackCounts.thumbsDown > 0) && (
+                                            <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                                              <span className="flex items-center gap-0.5 text-green-600">
+                                                <ThumbsUp className="h-3 w-3" />
+                                                {feedbackCounts.thumbsUp}
+                                              </span>
+                                              <span className="flex items-center gap-0.5 text-red-600">
+                                                <ThumbsDown className="h-3 w-3" />
+                                                {feedbackCounts.thumbsDown}
+                                              </span>
+                                            </div>
+                                          )}
+                                        </div>
+                                      </td>
+                                      <td className="p-2">
+                                        {exam.accepted ? (
+                                          <span className="text-green-500 font-semibold">✓ {exam.minScore}</span>
+                                        ) : (
+                                          <span className="text-red-500">✗ Not Accepted</span>
+                                        )}
+                                      </td>
+                                      <td className="p-2">
+                                        {exam.accepted && exam.credits ? (
+                                          <span>{exam.credits}</span>
+                                        ) : (
+                                          <span className="text-muted-foreground">-</span>
+                                        )}
+                                      </td>
+                                      <td className="p-2">
+                                        {exam.accepted && exam.courseCode ? (
+                                          <span className="text-muted-foreground">{exam.courseCode}</span>
+                                        ) : (
+                                          <span className="text-muted-foreground">-</span>
+                                        )}
+                                      </td>
+                                      <td className="p-2">
+                                        <div className="flex items-center gap-1">
+                                          <button
+                                            onClick={() => handleFeedbackClick(college.id, exam.exam, "up")}
+                                            className={`p-1 rounded hover:bg-accent transition-colors ${
+                                              currentFeedback === "up" ? "text-green-500 bg-green-500/20" : "text-muted-foreground hover:text-green-500"
+                                            }`}
+                                            title="Thumbs up"
+                                          >
+                                            <ThumbsUp className="h-3.5 w-3.5" />
+                                          </button>
+                                          <button
+                                            onClick={() => handleFeedbackClick(college.id, exam.exam, "down")}
+                                            className={`p-1 rounded hover:bg-accent transition-colors ${
+                                              currentFeedback === "down" ? "text-red-500 bg-red-500/20" : "text-muted-foreground hover:text-red-500"
+                                            }`}
+                                            title="Thumbs down"
+                                          >
+                                            <ThumbsDown className="h-3.5 w-3.5" />
+                                          </button>
+                                        </div>
+                                      </td>
+                                    </tr>
+                                  );
+                                })}
+                              </tbody>
+                            </table>
+                          </div>
+                        </div>
+
+                        {/* Action Buttons */}
                         <div className="flex gap-2 pt-2">
-                          <Button size="sm" variant="outline" className="flex-1 text-xs">
+                          <Button 
+                            size="sm" 
+                            variant="outline" 
+                            className="flex-1 text-xs"
+                            onClick={() => window.open(`mailto:info@${college.url}`, '_blank')}
+                          >
                             Contact
                           </Button>
-                          <Button size="sm" variant="outline" className="flex-1 text-xs">
+                          <Button 
+                            size="sm" 
+                            variant="outline" 
+                            className="flex-1 text-xs"
+                            onClick={() => {
+                              const url = college.url.startsWith('http') ? college.url : `https://${college.url}`;
+                              window.open(url, '_blank');
+                            }}
+                          >
                             Visit Website
                           </Button>
                         </div>
@@ -936,7 +1038,7 @@ const LearnerPortal = () => {
               <span className="font-semibold">Comparing {selectedForCompare.length} colleges</span>
               <div className="flex gap-2">
                 {selectedForCompare.map(id => {
-                  const college = allColleges.find(c => c.id === id);
+                  const college = getUniversityById(id);
                   return (
                     <Badge key={id} variant="secondary" className="flex items-center gap-1 pr-1">
                       {college?.name}
@@ -978,7 +1080,7 @@ const LearnerPortal = () => {
                 <tr className="border-b">
                   <th className="p-3 text-left sticky left-0 bg-card">CLEP Exam</th>
                   {selectedForCompare.map(id => {
-                    const college = allColleges.find(c => c.id === id);
+                    const college = getUniversityById(id);
                     return (
                       <th key={id} className="p-3 text-left min-w-[200px]">
                         <div>
@@ -993,22 +1095,82 @@ const LearnerPortal = () => {
                 </tr>
               </thead>
               <tbody>
-                {mockExamData.map((exam, idx) => (
-                  <tr key={idx} className="border-b">
-                    <td className="p-3 font-medium sticky left-0 bg-card">{exam.exam}</td>
-                    {selectedForCompare.map(id => (
-                      <td key={id} className="p-3">
-                        {exam.accepted ? (
-                          <div className="text-sm">
-                            <span className="text-green-500 font-semibold">✓</span> {exam.minScore} / {exam.credits}cr
-                          </div>
-                        ) : (
-                          <span className="text-red-500 text-sm">✗ Not Accepted</span>
-                        )}
+                {availableExams.map((examName) => {
+                  // Get exam data for each selected university
+                  const examData = selectedForCompare.map(id => {
+                    const university = getUniversityById(id);
+                    if (!university) return null;
+                    const policy = university.clepPolicies.find(p => p.examName === examName);
+                    return policy;
+                  });
+
+                  const feedbackCounts = getExamFeedbackCounts(examName);
+
+                  return (
+                    <tr key={examName} className="border-b">
+                      <td className="p-3 sticky left-0 bg-card">
+                        <div className="flex flex-col gap-1">
+                          <span className="font-medium">{examName}</span>
+                          {(feedbackCounts.thumbsUp > 0 || feedbackCounts.thumbsDown > 0) && (
+                            <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                              <span className="flex items-center gap-0.5 text-green-600">
+                                <ThumbsUp className="h-3 w-3" />
+                                {feedbackCounts.thumbsUp}
+                              </span>
+                              <span className="flex items-center gap-0.5 text-red-600">
+                                <ThumbsDown className="h-3 w-3" />
+                                {feedbackCounts.thumbsDown}
+                              </span>
+                            </div>
+                          )}
+                        </div>
                       </td>
-                    ))}
-                  </tr>
-                ))}
+                      {examData.map((policy, idx) => {
+                        const collegeId = selectedForCompare[idx];
+                        const currentFeedback = getFeedback(collegeId, examName);
+                        return (
+                          <td key={collegeId} className="p-3">
+                            <div className="flex items-start justify-between gap-2">
+                              <div className="flex-1">
+                                {policy && policy.minimumScore !== null ? (
+                                  <div className="text-sm">
+                                    <span className="text-green-500 font-semibold">✓</span> {policy.minimumScore}
+                                    {policy.creditsAwarded && ` / ${policy.creditsAwarded}cr`}
+                                    {policy.classEquivalent && (
+                                      <div className="text-xs text-muted-foreground mt-1">{policy.classEquivalent}</div>
+                                    )}
+                                  </div>
+                                ) : (
+                                  <span className="text-red-500 text-sm">✗ Not Accepted</span>
+                                )}
+                              </div>
+                              <div className="flex items-center gap-1 flex-shrink-0">
+                                <button
+                                  onClick={() => handleFeedbackClick(collegeId, examName, "up")}
+                                  className={`p-1.5 rounded hover:bg-accent transition-colors ${
+                                    currentFeedback === "up" ? "text-green-500 bg-green-500/20" : "text-muted-foreground hover:text-green-500"
+                                  }`}
+                                  title="Thumbs up"
+                                >
+                                  <ThumbsUp className="h-4 w-4" />
+                                </button>
+                                <button
+                                  onClick={() => handleFeedbackClick(collegeId, examName, "down")}
+                                  className={`p-1.5 rounded hover:bg-accent transition-colors ${
+                                    currentFeedback === "down" ? "text-red-500 bg-red-500/20" : "text-muted-foreground hover:text-red-500"
+                                  }`}
+                                  title="Thumbs down"
+                                >
+                                  <ThumbsDown className="h-4 w-4" />
+                                </button>
+                              </div>
+                            </div>
+                          </td>
+                        );
+                      })}
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>

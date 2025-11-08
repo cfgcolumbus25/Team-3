@@ -3,6 +3,7 @@ import { Bell, User, LogOut, Settings, HelpCircle, GraduationCap, Search } from 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useAuth } from "@/contexts/AuthContext";
+import { Link } from "react-router-dom";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -22,16 +23,22 @@ export const Navigation = () => {
           {/* Logo & Breadcrumb */}
           <div className="flex items-center gap-4">
             <div className="flex items-center gap-2">
-              <GraduationCap className="h-6 w-6 text-primary" />
-              <span className="font-bold text-lg">Modern States</span>
-            </div>
+            <Link to="/" className="flex items-center gap-2">
+                <img 
+                src="/ModernStates.png"       // path to PNG in the public folder
+                alt="Modern States Logo" 
+                className="h-12 w-16"        // match the size of the logo
+                />
+                <span className="font-bold text-lg">Modern States</span>
+            </Link>
             {user?.institution && (
-              <>
+                <>
                 <span className="text-muted-foreground">/</span>
                 <span className="text-sm text-muted-foreground">{user.institution.name}</span>
-              </>
+                </>
             )}
-          </div>
+            </div>
+        </div>
 
           {/* Right Side Actions */}
           <div className="flex items-center gap-3">

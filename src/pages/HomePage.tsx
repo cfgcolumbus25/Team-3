@@ -1,6 +1,8 @@
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Link } from "react-router-dom";
+import { LoginDropdown } from "@/components/LoginDropdown.tsx";
 import { 
   GraduationCap, 
   Shield, 
@@ -38,25 +40,19 @@ const Index = () => {
       {/* Navigation */}
       <nav className="border-b bg-card/50 backdrop-blur-sm sticky top-0 z-50">
         <div className="container mx-auto px-4">
-          <div className="flex items-center justify-between h-16">
+            <div className="flex items-center justify-between h-16">
             <div className="flex items-center gap-2">
-            <img 
-                src="/ModernStates.png"       // path to your PNG in the public folder
-                alt="Modern States Logo" 
-                className="h-12 w-16"  // match the size of the previous icon
-            />
-              <span className="font-bold text-xl">Modern States</span>
+                <Link to="/" className="flex items-center gap-2">
+                <img 
+                    src="public/ModernStates.png"       // path to the PNG in the public folder
+                    alt="Modern States Logo" 
+                    className="h-12 w-16"
+                />
+                <span className="font-bold text-xl">Modern States</span>
+                </Link>
             </div>
             <div className="flex items-center gap-3">
-              <Button variant="ghost" onClick={() => navigate('/learner')}>
-                For Learners
-              </Button>
-              <Button variant="ghost" onClick={() => navigate('/login/institution')}>
-                For Institutions
-              </Button>
-              <Button onClick={() => navigate('/login/admin')}>
-                Admin Login
-              </Button>
+              <LoginDropdown />
             </div>
           </div>
         </div>
@@ -64,7 +60,7 @@ const Index = () => {
 
       {/* Hero Section */}
       <div className="gradient-hero">
-        <div className="container mx-auto px-4 py-20 md:py-32">
+        <div className="container mx-auto px-4 pt-6 pb-20 md:pt-8 md:pb-32">
           <div className="max-w-4xl mx-auto text-center space-y-8">
             <Badge variant="secondary" className="mb-4">
               Trusted by Thousands of Students
@@ -108,11 +104,11 @@ const Index = () => {
             <div className="flex flex-col sm:flex-row gap-4 justify-center pt-6">
               <Button 
                 size="lg" 
-                className="text-lg h-14 px-8 shadow-lg hover:shadow-xl transition-smooth"
+                className="text-lg h-12 px-8 shadow-lg hover:shadow-xl transition-smooth"
                 onClick={() => navigate('/learner')}
               >
                 Start Searching
-                <ArrowRight className="ml-2 h-5 w-5" />
+                <ArrowRight className="ml-0.5 h-5 w-5" />
               </Button>
             </div>
           </div>
@@ -120,6 +116,14 @@ const Index = () => {
       </div>
 
       {/* Features Section */}
+      <div className="flex justify-center -mt-12">
+        <a href="#stats" className="animate-bounce">
+            <ArrowRight className="h-10 w-10 text-primary rotate-90 cursor-pointer" />
+        </a>
+      </div>
+      <div id="stats" className="flex flex-col items-center">
+                {/* CLEP Exams, Learners, Tuition Savings */}
+      </div>
       <div className="container mx-auto px-4 py-20">
         <div className="grid md:grid-cols-3 gap-8 mb-20">
           {features.map((feature, i) => (
@@ -138,7 +142,7 @@ const Index = () => {
           <div className="text-center max-w-2xl mx-auto">
             <h2 className="text-4xl font-bold mb-4">Choose Your Portal</h2>
             <p className="text-lg text-muted-foreground">
-              Whether you're a student, institution, or administrator, we have the right tools for you
+              Whether you're a student, institution, or administrator, we have the tool for you.
             </p>
           </div>
 

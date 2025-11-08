@@ -45,24 +45,25 @@ export const Sidebar = ({ role }: SidebarProps) => {
         <nav className="flex-1 p-4 space-y-2">
           {links.map((link) => (
             <NavLink
-              key={link.href}
-              to={link.href}
-              className={({ isActive }) =>
+                key={link.href}
+                to={link.href}
+                end={link.href === "/admin" || link.href === "/institution"} // exact match for dashboard
+                className={({ isActive }) =>
                 cn(
-                  "flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-all duration-200",
-                  "hover:bg-accent hover:text-accent-foreground",
-                  isActive && "bg-gradient-primary text-primary-foreground shadow-glow border-l-4 border-primary",
-                  collapsed && "justify-center"
+                    "flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-all duration-200",
+                    "hover:bg-accent hover:text-accent-foreground",
+                    isActive && "bg-gradient-primary text-primary-foreground shadow-glow border-l-4 border-primary",
+                    collapsed && "justify-center"
                 )
-              }
+                }
             >
-              {({ isActive }) => (
+                {({ isActive }) => (
                 <>
-                  <link.icon className={cn("h-5 w-5", isActive && "animate-pulse")} />
-                  {!collapsed && <span>{link.label}</span>}
+                    <link.icon className={cn("h-5 w-5", isActive && "animate-pulse")} />
+                    {!collapsed && <span>{link.label}</span>}
                 </>
-              )}
-            </NavLink>
+                )}
+          </NavLink>
           ))}
         </nav>
 
