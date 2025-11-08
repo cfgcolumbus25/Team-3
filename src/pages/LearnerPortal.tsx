@@ -328,6 +328,23 @@ const LearnerPortal = () => {
     );
   };
 
+  // Generate mock last updated date for an exam (based on exam name and university ID for consistency)
+  const getLastUpdated = (universityId: number, examName: string): string => {
+    // Use a hash-like approach to generate consistent dates per exam/university combination
+    const hash = (universityId * 1000 + examName.charCodeAt(0) + examName.length) % 365;
+    const daysAgo = hash % 730; // Range: 0-729 days ago (0 to ~2 years)
+    const date = new Date();
+    date.setDate(date.getDate() - daysAgo);
+    
+    // Format as relative date for recent updates
+    const daysDiff = Math.floor((new Date().getTime() - date.getTime()) / (1000 * 60 * 60 * 24));
+    if (daysDiff === 0) return "Today";
+    if (daysDiff === 1) return "Yesterday";
+    if (daysDiff < 30) return `${daysDiff} days ago`;
+    if (daysDiff < 365) return `${Math.floor(daysDiff / 30)} months ago`;
+    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+  };
+
   // Get exam data for a specific university (used in expanded card view)
   const getExamDataForUniversity = (universityId: number) => {
     // Find university from already-loaded allUniversities array
@@ -340,7 +357,8 @@ const LearnerPortal = () => {
       accepted: p.minimumScore !== null && p.minimumScore > 0,
       minScore: p.minimumScore,
       credits: p.creditsAwarded,
-      courseCode: p.classEquivalent
+      courseCode: p.classEquivalent,
+      lastUpdated: getLastUpdated(universityId, p.examName)
     }));
   };
 
@@ -1016,7 +1034,7 @@ const LearnerPortal = () => {
                                   <th className="text-left p-2">Exam</th>
                                   <th className="text-left p-2">Min Score</th>
                                   <th className="text-left p-2">Credits</th>
-                                  <th className="text-left p-2">Course Equivalent</th>
+                                  <th className="text-left p-2">Last Updated</th>
                                   <th className="text-left p-2">Feedback</th>
                                 </tr>
                               </thead>
@@ -1058,8 +1076,8 @@ const LearnerPortal = () => {
                                         )}
                                       </td>
                                       <td className="p-2">
-                                        {exam.accepted && exam.courseCode ? (
-                                          <span className="text-muted-foreground">{exam.courseCode}</span>
+                                        {exam.accepted ? (
+                                          <span className="text-xs text-muted-foreground">{exam.lastUpdated}</span>
                                         ) : (
                                           <span className="text-muted-foreground">-</span>
                                         )}
