@@ -7,7 +7,8 @@ import {
   Building2, 
   BookOpen, 
   ArrowRight,
-  CheckCircle2
+  CheckCircle2,
+  DollarSign
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 
@@ -39,8 +40,12 @@ const Index = () => {
         <div className="container mx-auto px-4">
           <div className="flex items-center justify-between h-16">
             <div className="flex items-center gap-2">
-              <GraduationCap className="h-6 w-6 text-primary" />
-              <span className="font-bold text-xl">Modern States CLEP</span>
+            <img 
+                src="/ModernStates.png"       // path to your PNG in the public folder
+                alt="Modern States Logo" 
+                className="h-12 w-16"  // match the size of the previous icon
+            />
+              <span className="font-bold text-xl">Modern States</span>
             </div>
             <div className="flex items-center gap-3">
               <Button variant="ghost" onClick={() => navigate('/learner')}>
@@ -65,8 +70,37 @@ const Index = () => {
               Trusted by Thousands of Students
             </Badge>
             <h1 className="text-5xl md:text-7xl font-bold leading-tight">
-              Your Gateway to <span className="gradient-primary bg-clip-text text-transparent">CLEP Credit</span> Acceptance
+                Turn CLEP Scores into Opportunities
             </h1>
+            {/* Statistics Section */}
+            <div className="flex flex-col md:flex-row justify-center items-center gap-12 mt-12 text-center">
+            {/* CLEP Exams (left) */}
+            <div className="flex flex-col items-center">
+                <BookOpen className="h-10 w-10 text-primary mb-2" />
+                <span className="text-4xl md:text-5xl font-bold text-foreground">140,000+</span>
+                <span className="text-sm md:text-base text-muted-foreground max-w-xs">
+                CLEP exams attempted
+                </span>
+            </div>
+
+            {/* Learners (center) */}
+            <div className="flex flex-col items-center">
+                <GraduationCap className="h-10 w-10 text-primary mb-2" />
+                <span className="text-4xl md:text-5xl font-bold text-foreground">600,000+</span>
+                <span className="text-sm md:text-base text-muted-foreground max-w-xs">
+                learners have taken Modern States courses
+                </span>
+            </div>
+
+            {/* Tuition Savings (right) */}
+            <div className="flex flex-col items-center">
+                <DollarSign className="h-10 w-10 text-primary mb-2" />
+                <span className="text-4xl md:text-5xl font-bold text-foreground">$175M</span>
+                <span className="text-sm md:text-base text-muted-foreground max-w-xs">
+                estimated tuition and fee savings
+                </span>
+            </div>
+            </div>
             <p className="text-xl md:text-2xl text-muted-foreground max-w-3xl mx-auto">
               Discover which colleges accept your CLEP exam credits. Search institutions, 
               compare acceptance policies, and make informed decisions about your education.
@@ -79,14 +113,6 @@ const Index = () => {
               >
                 Start Searching
                 <ArrowRight className="ml-2 h-5 w-5" />
-              </Button>
-              <Button 
-                size="lg" 
-                variant="outline" 
-                className="text-lg h-14 px-8"
-                onClick={() => navigate('/login/institution')}
-              >
-                Institution Portal
               </Button>
             </div>
           </div>
@@ -125,7 +151,7 @@ const Index = () => {
               </div>
               <h3 className="text-2xl font-bold mb-3">Learner Portal</h3>
               <p className="text-muted-foreground mb-6">
-                Search institutions, compare acceptance policies, and find colleges that accept your CLEP credits
+                Search colleges, compare credit policies, and see where your CLEP exams are accepted.
               </p>
               <ul className="space-y-2 mb-6">
                 {['Advanced filtering', 'Side-by-side comparison', 'AI chat assistant', 'Save favorites'].map((item) => (
@@ -149,7 +175,7 @@ const Index = () => {
               </div>
               <h3 className="text-2xl font-bold mb-3">Institution Portal</h3>
               <p className="text-muted-foreground mb-6">
-                Update and manage your CLEP acceptance policies with easy-to-use tools
+                Update and manage how your institution accepts CLEP exams with easy-to-use tools.
               </p>
               <ul className="space-y-2 mb-6">
                 {['AI chatbot updates', 'PDF document upload', 'Manual editing', 'Preview mode'].map((item) => (
@@ -173,7 +199,7 @@ const Index = () => {
               </div>
               <h3 className="text-2xl font-bold mb-3">Admin Portal</h3>
               <p className="text-muted-foreground mb-6">
-                Monitor system health, manage data quality, and communicate with institutions
+                Monitor system health, manage data quality, and communicate with institutions.
               </p>
               <ul className="space-y-2 mb-6">
                 {['KPI dashboard', 'Alert system', 'Email tracking', 'Data override'].map((item) => (
@@ -183,7 +209,7 @@ const Index = () => {
                   </li>
                 ))}
               </ul>
-              <Button variant="outline" className="w-full group-hover:shadow-lg transition-smooth">
+              <Button className="w-full group-hover:shadow-lg transition-smooth">
                 Admin Login
                 <ArrowRight className="ml-2 h-4 w-4" />
               </Button>
