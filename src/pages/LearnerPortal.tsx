@@ -362,137 +362,143 @@ const LearnerPortal = () => {
 
   // D3 donut visualization: run inside component and use allUniversities lookup
   useEffect(() => {
-    // ensure previous chart cleared
+    // clear any previous chart contents
     d3.select("#d3-chart").selectAll("*").remove();
 
     if (!showComparison) return;
 
-    const container = document.getElementById("d3-chart");
-    if (!container) return;
-
     let cancelled = false;
+    let ro: ResizeObserver | null = null;
 
-    const draw = () => {
+    // wait for #d3-chart to exist in the DOM (Dialog may mount asynchronously)
+    const waitForContainer = () => {
       if (cancelled) return;
-
-      // use actual layout width (getBoundingClientRect) and wait for a valid width
-      const containerRect = container.getBoundingClientRect();
-      const containerWidth = Math.max(200, Math.round(containerRect.width));
-      if (containerWidth < 50) {
-        // layout not ready yet — try again next frame
-        requestAnimationFrame(draw);
+      const container = document.getElementById("d3-chart");
+      if (!container) {
+        requestAnimationFrame(waitForContainer);
         return;
       }
 
-      const height = 160;
-      const padding = 16;
+      // once container exists, draw and observe size changes
+      const draw = () => {
+        if (cancelled) return;
 
-      // prepare data
-      const data = selectedForCompare.map((id) => {
-        const college = allUniversities.find(u => u.id === id);
-        return {
-          id,
-          name: college?.name || `ID ${id}`,
-          value: Math.min(college?.examsAccepted ?? 0, 39), // cap at 39
-        };
-      });
+        d3.select("#d3-chart").selectAll("*").remove();
 
-      // create single svg sized to container width
-      const svg = d3.select("#d3-chart")
-        .append("svg")
-        .attr("width", containerWidth)
-        .attr("height", height)
-        .attr("viewBox", `0 0 ${containerWidth} ${height}`)
-        .style("display", "block");
+        const containerRect = container.getBoundingClientRect();
+        const containerWidth = Math.max(200, Math.round(containerRect.width));
+        if (containerWidth < 50) {
+          // layout not stable yet — retry next frame
+          requestAnimationFrame(draw);
+          return;
+        }
 
-      if (data.length === 0) {
-        svg.append("text")
-          .attr("x", containerWidth / 2)
-          .attr("y", height / 2)
-          .attr("text-anchor", "middle")
-          .style("fill", "#8b8f98")
-          .style("font-size", "14px")
-          .text("Select 2–4 colleges to compare visualization");
-        return;
-      }
+        const height = 160;
+        const padding = 16;
 
-      const total = 39;
-      const gap = 12;
-      const perWidth = Math.max(120, Math.floor((containerWidth - padding * 2 - gap * (data.length - 1)) / data.length));
-      const color = d3.scaleOrdinal(d3.schemeTableau10 as any);
+        const data = selectedForCompare.map((id) => {
+          const college = allUniversities.find(u => u.id === id);
+          return {
+            id,
+            name: college?.name || `ID ${id}`,
+            value: Math.min(college?.examsAccepted ?? 0, 39),
+          };
+        });
 
-      data.forEach((d, i) => {
-        const groupX = padding + i * (perWidth + gap);
-        const group = svg.append("g").attr("transform", `translate(${groupX},0)`);
+        const svg = d3.select("#d3-chart")
+          .append("svg")
+          .attr("width", containerWidth)
+          .attr("height", height)
+          .attr("viewBox", `0 0 ${containerWidth} ${height}`)
+          .style("display", "block");
 
-        const cx = perWidth / 2;
-        const cy = height / 2 - 8;
-        const radius = Math.max(18, Math.min(perWidth, height) / 2 - 20);
-        const inner = Math.max(8, radius - 12);
+        if (data.length === 0) {
+          svg.append("text")
+            .attr("x", containerWidth / 2)
+            .attr("y", height / 2)
+            .attr("text-anchor", "middle")
+            .style("fill", "#8b8f98")
+            .style("font-size", "14px")
+            .text("Select 2–4 colleges to compare visualization");
+          return;
+        }
 
-        const arc = d3.arc().innerRadius(inner).outerRadius(radius);
+        const total = 39;
+        const gap = 12;
+        const perWidth = Math.max(120, Math.floor((containerWidth - padding * 2 - gap * (data.length - 1)) / data.length));
+        const color = d3.scaleOrdinal(d3.schemeTableau10 as any);
 
-        // background (full circle)
-        const bgPath = (arc as any)({ startAngle: 0, endAngle: 2 * Math.PI }) as string;
-        group.append("path")
-          .attr("d", bgPath)
-          .attr("transform", `translate(${cx},${cy})`)
-          .attr("fill", "#414d69");
+        data.forEach((d, i) => {
+          const groupX = padding + i * (perWidth + gap);
+          const group = svg.append("g").attr("transform", `translate(${groupX},0)`);
 
-        // foreground arc
-        const endAngle = (d.value / total) * 2 * Math.PI;
-        const fgPath = (arc as any)({ startAngle: 0, endAngle }) as string;
-        group.append("path")
-          .attr("d", fgPath)
-          .attr("transform", `translate(${cx},${cy})`)
-          .attr("fill", "#b0198a");
+          const cx = perWidth / 2;
+          const cy = height / 2 - 8;
+          const radius = Math.max(18, Math.min(perWidth, height) / 2 - 20);
+          const inner = Math.max(8, radius - 12);
 
-        // center combined text (numerator above small denominator)
-        const text = group.append("text")
-          .attr("x", cx)
-          .attr("y", cy)
-          .attr("text-anchor", "middle")
-          .style("font-family", "Inter, ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial")
-          .style("fill", "#111");
+          const arc = d3.arc().innerRadius(inner).outerRadius(radius);
 
-        text.append("tspan")
-          .attr("x", cx)
-          .attr("dy", "-6")
-          .style("font-size", "18px")
-          .style("font-weight", "700")
-          .text(String(d.value)); // numerator
+          const bgPath = (arc as any)({ startAngle: 0, endAngle: 2 * Math.PI }) as string;
+          group.append("path")
+            .attr("d", bgPath)
+            .attr("transform", `translate(${cx},${cy})`)
+            .attr("fill", "#e6e9ee");
 
-        text.append("tspan")
-          .attr("x", cx)
-          .attr("dy", "20")
-          .style("font-size", "12px")
-          .style("fill", "#666")
-          .text(`/${total}`);
+          const endAngle = (d.value / total) * 2 * Math.PI;
+          const fgPath = (arc as any)({ startAngle: 0, endAngle }) as string;
+          group.append("path")
+            .attr("d", fgPath)
+            .attr("transform", `translate(${cx},${cy})`)
+            .attr("fill", "#b0198a");
 
-        // label below
-        group.append("text")
-          .attr("x", cx)
-          .attr("y", height - 6)
-          .attr("text-anchor", "middle")
-          .style("font-size", "11px")
-          .style("fill", "#666")
-          .text(d.name.length > 18 ? d.name.slice(0, 15) + "…" : d.name);
-      });
-    };
+          const text = group.append("text")
+            .attr("x", cx)
+            .attr("y", cy)
+            .attr("text-anchor", "middle")
+            .style("font-family", "Inter, ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial")
+            .style("fill", "#111");
 
-    // draw after next frame to ensure modal layout is ready
-    requestAnimationFrame(draw);
+          text.append("tspan")
+            .attr("x", cx)
+            .attr("dy", "-6")
+            .style("font-size", "18px")
+            .style("font-weight", "700")
+            .text(String(d.value));
 
-    // re-draw when container resizes
-    const ro = new ResizeObserver(() => {
-      d3.select("#d3-chart").selectAll("*").remove();
+          text.append("tspan")
+            .attr("x", cx)
+            .attr("dy", "20")
+            .style("font-size", "12px")
+            .style("fill", "#666")
+            .text(`/${total}`);
+
+          group.append("text")
+            .attr("x", cx)
+            .attr("y", height - 6)
+            .attr("text-anchor", "middle")
+            .style("font-size", "11px")
+            .style("fill", "#666")
+            .text(d.name.length > 18 ? d.name.slice(0, 15) + "…" : d.name);
+        });
+      }; // end draw
+
+      // initial draw
       requestAnimationFrame(draw);
-    });
-    ro.observe(container);
+
+      // observe container for size changes
+      ro = new ResizeObserver(() => {
+        d3.select("#d3-chart").selectAll("*").remove();
+        requestAnimationFrame(draw);
+      });
+      ro.observe(container);
+    }; // end waitForContainer
+
+    requestAnimationFrame(waitForContainer);
 
     return () => {
       cancelled = true;
-      ro.disconnect();
+      if (ro) ro.disconnect();
       d3.select("#d3-chart").selectAll("*").remove();
     };
   }, [showComparison, selectedForCompare, allUniversities]);
