@@ -217,7 +217,7 @@ const InstitutionPortal = () => {
                   <Eye className="h-4 w-4" />
                   Preview as Learner
                 </Button>
-                <Button size="sm">Edit All</Button>
+                <Button size="sm" onClick={() => navigate("/institution/data-management")}>Edit All</Button>
               </div>
             </div>
             */}

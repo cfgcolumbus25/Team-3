@@ -17,6 +17,7 @@ import {
   saveInstitutionExamData,
   type InstitutionExamData,
 } from "@/lib/institutionDataStorage";
+import { useNavigate } from "react-router-dom";
 
 interface ExamData {
   id: string;
@@ -31,6 +32,7 @@ interface ExamData {
 const InstitutionDataManagement = () => {
   const { toast } = useToast();
   const { user } = useAuth();
+  const navigate = useNavigate();
   const [selectedExams, setSelectedExams] = useState<string[]>([]);
   const [hasChanges, setHasChanges] = useState(false);
   const [originalData, setOriginalData] = useState<ExamData[]>([]);
@@ -106,6 +108,7 @@ const InstitutionDataManagement = () => {
   };
 
   const handleSave = async () => {
+    console.log(user)
     if (!user?.institution?.diCode) {
       toast({
         title: "Error",
@@ -163,7 +166,8 @@ const InstitutionDataManagement = () => {
     }
 
     // Reload data to reflect saved changes
-    const storedData = getInstitutionExamData(institutionId);
+    const storedData = await getInstitutionExamData(institutionDiCode);
+    console.log(storedData)
     let mergedData: ExamData[] = [];
     
     if (university) {
@@ -187,6 +191,7 @@ const InstitutionDataManagement = () => {
     setOriginalData(JSON.parse(JSON.stringify(mergedData)));
     setHasChanges(false);
     setSelectedExams([]);
+    navigate("/institution/")
   };
 
   const handleReset = () => {
