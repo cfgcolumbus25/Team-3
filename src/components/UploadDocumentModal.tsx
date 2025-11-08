@@ -4,6 +4,23 @@ import { Button } from "@/components/ui/button";
 import { Upload, FileText, X, CheckCircle, AlertTriangle, XCircle } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
+// Extracted constants
+const VALID_FILE_TYPES = [
+  "application/pdf",
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  "text/csv",
+];
+const MAX_FILE_SIZE = 10 * 1024 * 1024;
+
+const UPLOAD_STAGES = [
+  { progress: 20, message: "Uploading file...", delay: 800 },
+  { progress: 40, message: "Extracting text...", delay: 1000 },
+  { progress: 60, message: "Identifying CLEP exams...", delay: 1200 },
+  { progress: 80, message: "Parsing scores and credits...", delay: 1000 },
+  { progress: 100, message: "Validating data...", delay: 800 },
+];
+
 interface UploadDocumentModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -53,10 +70,7 @@ export const UploadDocumentModal = ({ open, onOpenChange }: UploadDocumentModalP
   }, []);
 
   const handleFileSelect = (selectedFile: File) => {
-    const validTypes = ["application/pdf", "application/vnd.openxmlformats-officedocument.wordprocessingml.document", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", "text/csv"];
-    const maxSize = 10 * 1024 * 1024; // 10MB
-
-    if (!validTypes.includes(selectedFile.type)) {
+    if (!VALID_FILE_TYPES.includes(selectedFile.type)) {
       toast({
         title: "Invalid file type",
         description: "Please upload a PDF, DOCX, XLSX, or CSV file.",
@@ -65,7 +79,7 @@ export const UploadDocumentModal = ({ open, onOpenChange }: UploadDocumentModalP
       return;
     }
 
-    if (selectedFile.size > maxSize) {
+    if (selectedFile.size > MAX_FILE_SIZE) {
       toast({
         title: "File too large",
         description: "Maximum file size is 10MB.",
@@ -88,15 +102,7 @@ export const UploadDocumentModal = ({ open, onOpenChange }: UploadDocumentModalP
     setUploading(true);
     setProgress(0);
 
-    const stages = [
-      { progress: 20, message: "Uploading file...", delay: 800 },
-      { progress: 40, message: "Extracting text...", delay: 1000 },
-      { progress: 60, message: "Identifying CLEP exams...", delay: 1200 },
-      { progress: 80, message: "Parsing scores and credits...", delay: 1000 },
-      { progress: 100, message: "Validating data...", delay: 800 },
-    ];
-
-    for (const stage of stages) {
+    for (const stage of UPLOAD_STAGES) {
       await new Promise(resolve => setTimeout(resolve, stage.delay));
       setProgress(stage.progress);
       setStage(stage.message);
