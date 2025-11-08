@@ -16,6 +16,9 @@ const AdminSettings = () => {
   const [defaultMinScore, setDefaultMinScore] = useState("50");
   const [defaultCredits, setDefaultCredits] = useState("3");
   const [stalenessThreshold, setStalenessThreshold] = useState("180");
+  
+  const [showInput, setShowInput] = useState(false);
+  const [testEmail, setTestEmail] = useState("");
 
   const handleSaveSettings = () => {
     toast({
@@ -165,20 +168,53 @@ const AdminSettings = () => {
                     </p>
                   </div>
                   <div className="space-y-4">
-                    <div className="space-y-2">
-                      <Label>Reminder Email Template</Label>
-                      <Textarea
-                        rows={6}
-                        defaultValue="Dear {institution_name},&#10;&#10;We noticed your CLEP acceptance data hasn't been updated in {days_since_update} days. Please review and update your information to ensure learners have access to current policies.&#10;&#10;Best regards,&#10;Modern States Team"
-                      />
-                      <p className="text-xs text-muted-foreground">
-                        Available variables: {"{institution_name}"}, {"{days_since_update}"}, {"{exam_name}"}
-                      </p>
-                    </div>
+                    {/* New subject input */}
+                        <div className="space-y-2">
+                            <Label>Email Subject</Label>
+                            <Input
+                            type="text"
+                            placeholder="Reminder: Please update your CLEP credit information"
+                            defaultValue="Reminder: Please update your CLEP credit information"
+                            />
+                        </div>
+
+                        {/* Existing email body */}
+                        <div className="space-y-2">
+                            <Label>Reminder Email Template</Label>
+                            <Textarea
+                            rows={6}
+                            defaultValue={`Dear {institution_name},\n\nWe noticed your CLEP acceptance data hasn't been updated in {days_since_update} days. Please review and update your information to ensure learners have access to current policies. 
+                                          \n\n Follow this link to log in and update your information: https://modernstates.com/institution \n\n Thank you! \n\nBest,\nModern States Team`}
+                            />
+                        </div>
                     <div className="flex gap-2">
                       <Button variant="outline">Preview Email</Button>
-                      <Button variant="outline">Send Test Email</Button>
+                      <Button
+                        variant="outline"
+                        onClick={() => setShowInput(!showInput)}
+                        >
+                        Send Test Email
+                      </Button>
                     </div>
+                    {showInput && (
+                        <div className="flex gap-2 mt-2">
+                        <Input
+                            type="email"
+                            placeholder="Enter email address"
+                            value={testEmail}
+                            onChange={(e) => setTestEmail(e.target.value)}
+                            className="flex-1"
+                        />
+                        <Button
+                            onClick={() => {
+                                const hardcodedEmail = "ajiang0210@gmail.com";
+                                console.log("Sending test email to:", hardcodedEmail);
+                            }}
+                        >
+                            Send
+                        </Button>
+                        </div>
+                    )}
                     <div className="space-y-2">
                       <Label>Email Schedule</Label>
                       <select className="w-full h-10 px-3 rounded-lg bg-background border border-border">
