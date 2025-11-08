@@ -89,7 +89,7 @@ const LearnerPortal = () => {
     return "That's a great question! I can help you find colleges that accept CLEP credits, compare acceptance policies, and answer questions about exams and scoring. Try asking me about specific colleges, states, or exams you're interested in!";
   };
 
-  const handleSend = () => {
+  const handleSend = async () => {
     if (!input.trim() || isLoading) return;
 
     const userMessage: Message = {
@@ -103,16 +103,34 @@ const LearnerPortal = () => {
     setInput("");
     setIsLoading(true);
 
-    setTimeout(() => {
+    try {
+      const res = await fetch("/api/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ message: input }),
+      });
+
+      const data = await res.json();
+
       const aiMessage: Message = {
         id: (Date.now() + 1).toString(),
-        text: getAIResponse(input),
+        text: data.reply,
+        sender: "ai",
+        timestamp: new Date(),
+      };
+
+      setMessages((prev) => [...prev, aiMessage]);
+    } catch (error) {
+      const aiMessage: Message = {
+        id: (Date.now() + 1).toString(),
+        text: "Sorry, I had trouble answering that. Try again!",
         sender: "ai",
         timestamp: new Date(),
       };
       setMessages((prev) => [...prev, aiMessage]);
-      setIsLoading(false);
-    }, 1500);
+    }
+
+    setIsLoading(false);
   };
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
