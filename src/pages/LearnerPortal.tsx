@@ -45,6 +45,7 @@ const LearnerPortal = () => {
   const [selectedForCompare, setSelectedForCompare] = useState<number[]>([]);
   const [expandedCard, setExpandedCard] = useState<number | null>(null);
   const [showComparison, setShowComparison] = useState(false);
+  const [selectedCollegeDetails, setSelectedCollegeDetails] = useState<number | null>(null);
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
   const [sortOption, setSortOption] = useState<"name" | "mostExams" | "lowestScore">("name");
   const [userExamScores, setUserExamScores] = useState<UserExamScore[]>([]);
@@ -483,7 +484,7 @@ const LearnerPortal = () => {
             <div className="space-y-3">
               <h4 className="font-medium text-sm">Location</h4>
               <select 
-                className="w-full h-10 px-3 rounded-lg bg-background border border-border focus:border-primary focus:outline-none"
+                className="w-full h-10 px-4 py-2 rounded-lg bg-background border border-border focus:border-primary focus:outline-none"
                 value={selectedState}
                 onChange={(e) => setSelectedState(e.target.value)}
               >
@@ -539,11 +540,20 @@ const LearnerPortal = () => {
                 <option value="WI">Wisconsin</option>
                 <option value="WY">Wyoming</option>
               </select>
-              <Input 
-                placeholder="Enter ZIP code" 
-                value={zipCode}
-                onChange={(e) => setZipCode(e.target.value)}
-              />
+              <div className="space-y-1">
+                <Input 
+                  placeholder="Enter ZIP code (required)" 
+                  value={zipCode}
+                  onChange={(e) => setZipCode(e.target.value)}
+                  required
+                  pattern="[0-9]{5}(-[0-9]{4})?"
+                  title="Please enter a valid 5-digit ZIP code (e.g., 12345 or 12345-6789)"
+                  className={!zipCode.trim() ? "border-destructive" : ""}
+                />
+                {!zipCode.trim() && (
+                  <p className="text-xs text-destructive">ZIP code is required</p>
+                )}
+              </div>
               <div className="space-y-2">
                 <label className="text-sm text-muted-foreground">Within miles</label>
                 <input
@@ -777,15 +787,9 @@ const LearnerPortal = () => {
               {filteredColleges.map((college) => (
                 <Card
                   key={college.id}
-                  className={`p-4 hover-lift cursor-pointer transition-all ${
+                  className={`p-4 hover-lift transition-all ${
                     college.highlighted ? "border-primary shadow-glow" : ""
                   }`}
-                  onClick={() => {
-                    // Navigate to institution login with the college's DI code
-                    // This allows the institution to view their own data
-                    const diCode = college.diCode.toString();
-                    window.location.href = `/login/institution?diCode=${diCode}`;
-                  }}
                 >
                   <div className="space-y-3">
                     <div className="flex items-start justify-between">
@@ -977,6 +981,14 @@ const LearnerPortal = () => {
                         <div className="flex gap-2 pt-2">
                           <Button 
                             size="sm" 
+                            variant="default" 
+                            className="flex-1 text-xs"
+                            onClick={() => setSelectedCollegeDetails(college.id)}
+                          >
+                            View Details
+                          </Button>
+                          <Button 
+                            size="sm" 
                             variant="outline" 
                             className="flex-1 text-xs"
                             onClick={() => window.open(`mailto:info@${college.url}`, '_blank')}
@@ -1019,13 +1031,27 @@ const LearnerPortal = () => {
               </div>
               
               <div className="border border-border rounded-lg overflow-hidden">
-                <div 
-                  id="google-maps-container"
-                  className="w-full h-[500px]"
-                  style={{ minHeight: '500px' }}
-                >
-                  <CollegeMap />
-                </div>
+                {zipCode.trim() ? (
+                  <div 
+                    id="google-maps-container"
+                    className="w-full h-[500px]"
+                    style={{ minHeight: '500px' }}
+                  >
+                    <CollegeMap zipCode={zipCode.trim()} distance={distance} />
+                  </div>
+                ) : (
+                  <div 
+                    className="w-full h-[500px] bg-muted/20 flex items-center justify-center"
+                    style={{ minHeight: '500px' }}
+                  >
+                    <div className="text-center space-y-2">
+                      <Map className="h-12 w-12 text-muted-foreground mx-auto opacity-50" />
+                      <p className="text-sm text-muted-foreground font-medium">
+                        Please enter a ZIP code to view colleges on the map
+                      </p>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           </div>
@@ -1182,6 +1208,189 @@ const LearnerPortal = () => {
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* College Details Dialog */}
+      {selectedCollegeDetails && (() => {
+        const college = filteredColleges.find(c => c.id === selectedCollegeDetails);
+        if (!college) return null;
+        
+        return (
+          <Dialog open={selectedCollegeDetails !== null} onOpenChange={(open) => !open && setSelectedCollegeDetails(null)}>
+            <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+              <DialogHeader>
+                <DialogTitle>{college.name}</DialogTitle>
+              </DialogHeader>
+              <div className="space-y-6">
+                {/* Basic Information */}
+                <div>
+                  <h3 className="font-semibold mb-3">Institution Information</h3>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <p className="text-sm text-muted-foreground">Location</p>
+                      <p className="font-medium">{college.city}, {college.state} {college.zip}</p>
+                    </div>
+                    <div>
+                      <p className="text-sm text-muted-foreground">Enrollment</p>
+                      <p className="font-medium">{college.enrollment.toLocaleString()}</p>
+                    </div>
+                    <div>
+                      <p className="text-sm text-muted-foreground">DI Code</p>
+                      <p className="font-medium">{college.diCode}</p>
+                    </div>
+                    <div>
+                      <p className="text-sm text-muted-foreground">Max Credits</p>
+                      <p className="font-medium">{college.maxCredits}</p>
+                    </div>
+                    <div>
+                      <p className="text-sm text-muted-foreground">Transcription Fee</p>
+                      <p className="font-medium">${college.transcriptionFee}</p>
+                    </div>
+                    <div>
+                      <p className="text-sm text-muted-foreground">Score Validity</p>
+                      <p className="font-medium">{college.scoreValidityYears} years</p>
+                    </div>
+                    <div>
+                      <p className="text-sm text-muted-foreground">Can Use For Failed Courses</p>
+                      <p className="font-medium">{college.canUseForFailedCourses ? "Yes" : "No"}</p>
+                    </div>
+                    <div>
+                      <p className="text-sm text-muted-foreground">Enrolled Students Can Use CLEP</p>
+                      <p className="font-medium">{college.canEnrolledStudentsUseCLEP ? "Yes" : "No"}</p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* CLEP Exam Policies */}
+                <div>
+                  <h3 className="font-semibold mb-3">CLEP Exam Policies ({college.examsAccepted} accepted)</h3>
+                  <div className="border rounded-lg overflow-hidden">
+                    <div className="max-h-96 overflow-y-auto overflow-x-auto">
+                      <table className="w-full text-sm min-w-full">
+                        <thead className="bg-accent/50 sticky top-0">
+                          <tr>
+                            <th className="text-left p-3 whitespace-nowrap">Exam</th>
+                            <th className="text-left p-3 whitespace-nowrap">Min Score</th>
+                            <th className="text-left p-3 whitespace-nowrap">Credits</th>
+                            <th className="text-left p-3 whitespace-nowrap">Course Equivalent</th>
+                            <th className="text-left p-3 whitespace-nowrap">Feedback</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {getExamDataForUniversity(college.id).map((exam, idx) => {
+                            const currentFeedback = getFeedback(college.id, exam.exam);
+                            const feedbackCounts = getExamFeedbackCounts(exam.exam);
+                            return (
+                              <tr key={idx} className="border-t hover:bg-accent/30">
+                                <td className="p-3 font-medium whitespace-nowrap">
+                                  <div className="flex flex-col gap-1">
+                                    <span>{exam.exam}</span>
+                                    {(feedbackCounts.thumbsUp > 0 || feedbackCounts.thumbsDown > 0) && (
+                                      <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                                        <span className="flex items-center gap-0.5 text-green-600">
+                                          <ThumbsUp className="h-3 w-3" />
+                                          {feedbackCounts.thumbsUp}
+                                        </span>
+                                        <span className="flex items-center gap-0.5 text-red-600">
+                                          <ThumbsDown className="h-3 w-3" />
+                                          {feedbackCounts.thumbsDown}
+                                        </span>
+                                      </div>
+                                    )}
+                                  </div>
+                                </td>
+                                <td className="p-3 whitespace-nowrap">
+                                  {exam.minScore ? (
+                                    <span className="font-semibold">{exam.minScore}</span>
+                                  ) : (
+                                    <span className="text-muted-foreground">Not accepted</span>
+                                  )}
+                                </td>
+                                <td className="p-3 whitespace-nowrap">
+                                  {exam.credits ? (
+                                    <span className="font-semibold">{exam.credits}</span>
+                                  ) : (
+                                    <span className="text-muted-foreground">-</span>
+                                  )}
+                                </td>
+                                <td className="p-3 whitespace-nowrap">
+                                  {exam.courseEquivalent ? (
+                                    <span className="font-medium">{exam.courseEquivalent}</span>
+                                  ) : (
+                                    <span className="text-muted-foreground">-</span>
+                                  )}
+                                </td>
+                                <td className="p-3 whitespace-nowrap">
+                                  <div className="flex items-center gap-1">
+                                    <button
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        handleFeedbackClick(college.id, exam.exam, "up");
+                                      }}
+                                      className={`p-1.5 rounded hover:bg-accent transition-colors ${
+                                        currentFeedback === "up" ? "text-green-500 bg-green-500/20" : "text-muted-foreground hover:text-green-500"
+                                      }`}
+                                      title="Thumbs up"
+                                    >
+                                      <ThumbsUp className="h-4 w-4" />
+                                    </button>
+                                    <button
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        handleFeedbackClick(college.id, exam.exam, "down");
+                                      }}
+                                      className={`p-1.5 rounded hover:bg-accent transition-colors ${
+                                        currentFeedback === "down" ? "text-red-500 bg-red-500/20" : "text-muted-foreground hover:text-red-500"
+                                      }`}
+                                      title="Thumbs down"
+                                    >
+                                      <ThumbsDown className="h-4 w-4" />
+                                    </button>
+                                  </div>
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Action Buttons */}
+                <div className="flex gap-2 pt-4 border-t">
+                  <Button 
+                    variant="outline" 
+                    className="flex-1"
+                    onClick={() => {
+                      const diCode = college.diCode.toString();
+                      window.location.href = `/login/institution?diCode=${diCode}`;
+                    }}
+                  >
+                    Institution Login
+                  </Button>
+                  <Button 
+                    variant="outline" 
+                    className="flex-1"
+                    onClick={() => window.open(`mailto:info@${college.url}`, '_blank')}
+                  >
+                    Contact
+                  </Button>
+                  <Button 
+                    variant="default" 
+                    className="flex-1"
+                    onClick={() => {
+                      const url = college.url.startsWith('http') ? college.url : `https://${college.url}`;
+                      window.open(url, '_blank');
+                    }}
+                  >
+                    Visit Website
+                  </Button>
+                </div>
+              </div>
+            </DialogContent>
+          </Dialog>
+        );
+      })()}
     </div>
   );
 };
