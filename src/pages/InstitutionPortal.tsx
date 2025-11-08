@@ -189,7 +189,9 @@ const InstitutionPortal = () => {
           </div>
 
           {/* Data Preview */}
+          
           <Card className="p-6 shadow-card">
+            {/*}
             <div className="flex items-center justify-between mb-6">
               <h2 className="text-xl font-bold">Current CLEP Data</h2>
               <div className="flex gap-2">
@@ -200,6 +202,8 @@ const InstitutionPortal = () => {
                 <Button size="sm">Edit All</Button>
               </div>
             </div>
+            */}
+            
 
             {/* Sample Data Table */}
             <div className="overflow-x-auto">
