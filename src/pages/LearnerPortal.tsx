@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useMemo } from "react";
 import { Send, Bot, User, ChevronLeft, ChevronRight, MapPin, Star, X, Grid3x3, List, Download } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -24,6 +24,16 @@ interface College {
   highlighted?: boolean;
 }
 
+// Original colleges data
+const allColleges: College[] = [
+  { id: 1, name: "Ohio State University", city: "Columbus", state: "OH", examsAccepted: 28, avgScore: 52, credits: "3-4" },
+  { id: 2, name: "Penn State University", city: "University Park", state: "PA", examsAccepted: 25, avgScore: 50, credits: "3-6" },
+  { id: 3, name: "University of California, Berkeley", city: "Berkeley", state: "CA", examsAccepted: 22, avgScore: 55, credits: "3" },
+  { id: 4, name: "Texas A&M University", city: "College Station", state: "TX", examsAccepted: 30, avgScore: 50, credits: "3-4" },
+  { id: 5, name: "University of Michigan", city: "Ann Arbor", state: "MI", examsAccepted: 26, avgScore: 53, credits: "3-4" },
+  { id: 6, name: "University of Florida", city: "Gainesville", state: "FL", examsAccepted: 29, avgScore: 50, credits: "3-6" },
+];
+
 const LearnerPortal = () => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
@@ -34,14 +44,56 @@ const LearnerPortal = () => {
   const [showComparison, setShowComparison] = useState(false);
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const chatbotSectionRef = useRef<HTMLDivElement>(null);
 
-  const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  };
+  // Filter state
+  const [selectedState, setSelectedState] = useState<string>("");
+  const [zipCode, setZipCode] = useState<string>("");
+  const [distance, setDistance] = useState<number>(100);
+  const [institutionTypes, setInstitutionTypes] = useState<string[]>([]);
+  const [selectedExams, setSelectedExams] = useState<string[]>([]);
+  const [minScore, setMinScore] = useState<number>(50);
+  const [minCredits, setMinCredits] = useState<number>(3);
 
+  // Scroll to top when component mounts to ensure chatbot is visible first
   useEffect(() => {
-    scrollToBottom();
-  }, [messages]);
+    // Prevent browser scroll restoration
+    if ('scrollRestoration' in history) {
+      history.scrollRestoration = 'manual';
+    }
+    
+    // Force scroll to top immediately and multiple times to ensure it sticks
+    const scrollToTop = () => {
+      window.scrollTo({ top: 0, left: 0, behavior: "instant" });
+      if (document.documentElement) document.documentElement.scrollTop = 0;
+      if (document.body) document.body.scrollTop = 0;
+    };
+    
+    scrollToTop();
+    
+    // Scroll to top at intervals to override any auto-scroll
+    const intervals = [10, 50, 100, 200, 500, 1000].map(delay => 
+      setTimeout(scrollToTop, delay)
+    );
+    
+    // Also scroll to chatbot section specifically
+    const scrollToChatbot = () => {
+      if (chatbotSectionRef.current) {
+        chatbotSectionRef.current.scrollIntoView({ behavior: "instant", block: "start" });
+      }
+    };
+    
+    const chatbotIntervals = [100, 300, 600].map(delay => 
+      setTimeout(scrollToChatbot, delay)
+    );
+    
+    return () => {
+      intervals.forEach(clearTimeout);
+      chatbotIntervals.forEach(clearTimeout);
+    };
+  }, []);
+
+  // Removed auto-scroll on message send to prevent browser scrolling
 
   const suggestedQuestions = [
     "Colleges in California",
@@ -50,27 +102,72 @@ const LearnerPortal = () => {
     "Low score requirements",
   ];
 
-  const [colleges, setColleges] = useState<College[]>([
-    { id: 1, name: "Ohio State University", city: "Columbus", state: "OH", examsAccepted: 28, avgScore: 52, credits: "3-4" },
-    { id: 2, name: "Penn State University", city: "University Park", state: "PA", examsAccepted: 25, avgScore: 50, credits: "3-6" },
-    { id: 3, name: "University of California, Berkeley", city: "Berkeley", state: "CA", examsAccepted: 22, avgScore: 55, credits: "3" },
-    { id: 4, name: "Texas A&M University", city: "College Station", state: "TX", examsAccepted: 30, avgScore: 50, credits: "3-4" },
-    { id: 5, name: "University of Michigan", city: "Ann Arbor", state: "MI", examsAccepted: 26, avgScore: 53, credits: "3-4" },
-    { id: 6, name: "University of Florida", city: "Gainesville", state: "FL", examsAccepted: 29, avgScore: 50, credits: "3-6" },
-  ]);
+  // Filter colleges based on filter state
+  const filteredColleges = useMemo(() => {
+    return allColleges.filter(college => {
+      // State filter
+      if (selectedState && college.state !== selectedState) {
+        return false;
+      }
+
+      // Score filter
+      if (college.avgScore < minScore) {
+        return false;
+      }
+
+      // Credits filter - check if college's credit range meets minimum
+      const creditMin = parseInt(college.credits.split("-")[0]);
+      if (creditMin < minCredits) {
+        return false;
+      }
+
+      // Exam filter - if exams are selected, check if college accepts enough exams
+      if (selectedExams.length > 0 && college.examsAccepted < selectedExams.length) {
+        return false;
+      }
+
+      return true;
+    });
+  }, [selectedState, minScore, minCredits, selectedExams]);
+
+  // Filter handler functions
+  const handleInstitutionTypeToggle = (type: string) => {
+    setInstitutionTypes(prev =>
+      prev.includes(type) ? prev.filter(t => t !== type) : [...prev, type]
+    );
+  };
+
+  const handleExamSelect = (exam: string) => {
+    setSelectedExams(prev =>
+      prev.includes(exam) ? prev.filter(e => e !== exam) : [...prev, exam]
+    );
+  };
+
+  const clearAllFilters = () => {
+    setSelectedState("");
+    setZipCode("");
+    setDistance(100);
+    setInstitutionTypes([]);
+    setSelectedExams([]);
+    setMinScore(50);
+    setMinCredits(3);
+  };
 
   const getAIResponse = (userMessage: string): string => {
     const lower = userMessage.toLowerCase();
     
     if (lower.includes("biology") || lower.includes("science")) {
+      handleExamSelect("biology");
       return "Great! I found 12 colleges that accept Biology CLEP.\n\nI've applied the filters for you:\n✓ Exam: Biology\n\nThe top results are showing below. Would you like to see colleges with specific minimum scores or credit requirements?";
     }
     
     if (lower.includes("ohio")) {
+      setSelectedState("OH");
       return "I found several colleges in Ohio that accept CLEP credits! Ohio State University is one of the top options, accepting 28 out of 34 CLEP exams with an average minimum score of 52.\n\nI've filtered the results to show Ohio colleges. Check them out below!";
     }
     
     if (lower.includes("california") || lower.includes("ca")) {
+      setSelectedState("CA");
       return "California has many excellent CLEP-friendly colleges! UC Berkeley and other UC schools accept various CLEP exams.\n\nI've updated the filters to show California colleges. Would you like to narrow down by exam type?";
     }
     
@@ -143,8 +240,8 @@ const LearnerPortal = () => {
 
   return (
     <div className="min-h-screen bg-background flex flex-col">
-      {/* TOP SECTION - CHATBOT (40% height) */}
-      <div className="h-[40vh] bg-gradient-to-b from-card/50 to-background border-b border-border flex flex-col">
+      {/* TOP SECTION - CHATBOT (60% height) */}
+      <div ref={chatbotSectionRef} className="h-[60vh] bg-gradient-to-b from-card/50 to-background border-b border-border flex flex-col">
         <div className="flex-1 overflow-y-auto p-6">
           <div className="max-w-5xl mx-auto">
             {/* Welcome Message */}
@@ -294,7 +391,11 @@ const LearnerPortal = () => {
             {/* Location Filters */}
             <div className="space-y-3">
               <h4 className="font-medium text-sm">Location</h4>
-              <select className="w-full h-10 px-3 rounded-lg bg-background border border-border focus:border-primary focus:outline-none">
+              <select 
+                className="w-full h-10 px-3 rounded-lg bg-background border border-border focus:border-primary focus:outline-none"
+                value={selectedState}
+                onChange={(e) => setSelectedState(e.target.value)}
+              >
                 <option value="">Select State</option>
                 <option value="OH">Ohio</option>
                 <option value="PA">Pennsylvania</option>
@@ -303,19 +404,24 @@ const LearnerPortal = () => {
                 <option value="FL">Florida</option>
                 <option value="MI">Michigan</option>
               </select>
-              <Input placeholder="Enter ZIP code" />
+              <Input 
+                placeholder="Enter ZIP code" 
+                value={zipCode}
+                onChange={(e) => setZipCode(e.target.value)}
+              />
               <div className="space-y-2">
                 <label className="text-sm text-muted-foreground">Within miles</label>
                 <input
                   type="range"
                   min="0"
                   max="500"
-                  defaultValue="100"
+                  value={distance}
+                  onChange={(e) => setDistance(Number(e.target.value))}
                   className="w-full"
                 />
                 <div className="flex justify-between text-xs text-muted-foreground">
                   <span>0</span>
-                  <span>100 miles</span>
+                  <span>{distance} miles</span>
                   <span>500</span>
                 </div>
               </div>
@@ -326,23 +432,48 @@ const LearnerPortal = () => {
               <h4 className="font-medium text-sm">Institution Type</h4>
               <div className="space-y-2">
                 <label className="flex items-center gap-2 text-sm">
-                  <input type="checkbox" className="rounded" />
+                  <input 
+                    type="checkbox" 
+                    className="rounded" 
+                    checked={institutionTypes.includes("public")}
+                    onChange={() => handleInstitutionTypeToggle("public")}
+                  />
                   <span>Public</span>
                 </label>
                 <label className="flex items-center gap-2 text-sm">
-                  <input type="checkbox" className="rounded" />
+                  <input 
+                    type="checkbox" 
+                    className="rounded" 
+                    checked={institutionTypes.includes("private")}
+                    onChange={() => handleInstitutionTypeToggle("private")}
+                  />
                   <span>Private</span>
                 </label>
                 <label className="flex items-center gap-2 text-sm">
-                  <input type="checkbox" className="rounded" />
+                  <input 
+                    type="checkbox" 
+                    className="rounded" 
+                    checked={institutionTypes.includes("2-year")}
+                    onChange={() => handleInstitutionTypeToggle("2-year")}
+                  />
                   <span>2-Year</span>
                 </label>
                 <label className="flex items-center gap-2 text-sm">
-                  <input type="checkbox" className="rounded" />
+                  <input 
+                    type="checkbox" 
+                    className="rounded" 
+                    checked={institutionTypes.includes("4-year")}
+                    onChange={() => handleInstitutionTypeToggle("4-year")}
+                  />
                   <span>4-Year</span>
                 </label>
                 <label className="flex items-center gap-2 text-sm">
-                  <input type="checkbox" className="rounded" />
+                  <input 
+                    type="checkbox" 
+                    className="rounded" 
+                    checked={institutionTypes.includes("online")}
+                    onChange={() => handleInstitutionTypeToggle("online")}
+                  />
                   <span>Online Programs Available</span>
                 </label>
               </div>
@@ -351,37 +482,44 @@ const LearnerPortal = () => {
             {/* CLEP Exam Selection */}
             <div className="space-y-3">
               <h4 className="font-medium text-sm">CLEP Exams</h4>
-              <select className="w-full h-10 px-3 rounded-lg bg-background border border-border focus:border-primary focus:outline-none">
-                <option value="">Select exams</option>
-                <option value="biology">Biology</option>
-                <option value="chemistry">Chemistry</option>
-                <option value="calculus">Calculus</option>
-                <option value="american-gov">American Government</option>
-                <option value="history">U.S. History</option>
-              </select>
-              <p className="text-xs text-muted-foreground">0 exams selected</p>
+              <div className="space-y-2 max-h-40 overflow-y-auto border rounded-lg p-2">
+                {["biology", "chemistry", "calculus", "american-gov", "history"].map((exam) => (
+                  <label key={exam} className="flex items-center gap-2 text-sm">
+                    <input 
+                      type="checkbox" 
+                      className="rounded" 
+                      checked={selectedExams.includes(exam)}
+                      onChange={() => handleExamSelect(exam)}
+                    />
+                    <span className="capitalize">{exam.replace("-", " ")}</span>
+                  </label>
+                ))}
+              </div>
+              <p className="text-xs text-muted-foreground">{selectedExams.length} exam{selectedExams.length !== 1 ? 's' : ''} selected</p>
             </div>
 
             {/* Score & Credit Requirements */}
             <div className="space-y-3">
               <h4 className="font-medium text-sm">Requirements</h4>
               <div className="space-y-2">
-                <label className="text-sm text-muted-foreground">Minimum Score: 50</label>
+                <label className="text-sm text-muted-foreground">Minimum Score: {minScore}</label>
                 <input
                   type="range"
                   min="20"
                   max="80"
-                  defaultValue="50"
+                  value={minScore}
+                  onChange={(e) => setMinScore(Number(e.target.value))}
                   className="w-full"
                 />
               </div>
               <div className="space-y-2">
-                <label className="text-sm text-muted-foreground">Minimum Credits: 3</label>
+                <label className="text-sm text-muted-foreground">Minimum Credits: {minCredits}</label>
                 <input
                   type="range"
                   min="0"
                   max="16"
-                  defaultValue="3"
+                  value={minCredits}
+                  onChange={(e) => setMinCredits(Number(e.target.value))}
                   className="w-full"
                 />
               </div>
@@ -389,10 +527,9 @@ const LearnerPortal = () => {
 
             {/* Filter Actions */}
             <div className="space-y-2 pt-4 border-t">
-              <Button className="w-full">Apply Filters</Button>
-              <button className="w-full text-sm text-muted-foreground hover:text-foreground">
+              <Button className="w-full" onClick={clearAllFilters}>
                 Clear All Filters
-              </button>
+              </Button>
             </div>
           </div>
         </div>
@@ -401,7 +538,7 @@ const LearnerPortal = () => {
         {filtersCollapsed && (
           <button
             onClick={() => setFiltersCollapsed(false)}
-            className="fixed left-0 top-[45vh] z-10 bg-card border border-border rounded-r-lg p-2 hover:bg-accent transition-smooth shadow-lg"
+            className="fixed left-0 top-[65vh] z-10 bg-card border border-border rounded-r-lg p-2 hover:bg-accent transition-smooth shadow-lg"
           >
             <ChevronRight className="h-4 w-4" />
           </button>
@@ -413,7 +550,7 @@ const LearnerPortal = () => {
           <div className="p-4 border-b border-border bg-card/50 flex items-center justify-between">
             <div>
               <h2 className="font-semibold">Results</h2>
-              <p className="text-sm text-muted-foreground">Showing {colleges.length} colleges</p>
+              <p className="text-sm text-muted-foreground">Showing {filteredColleges.length} college{filteredColleges.length !== 1 ? 's' : ''}</p>
             </div>
             <div className="flex items-center gap-2">
               <select className="h-9 px-3 rounded-lg bg-background border border-border text-sm">
@@ -456,7 +593,7 @@ const LearnerPortal = () => {
                   : "space-y-4"
               }
             >
-              {colleges.map((college) => (
+              {filteredColleges.map((college) => (
                 <Card
                   key={college.id}
                   className={`p-4 hover-lift cursor-pointer transition-all ${
@@ -564,7 +701,7 @@ const LearnerPortal = () => {
               <span className="font-semibold">Comparing {selectedForCompare.length} colleges</span>
               <div className="flex gap-2">
                 {selectedForCompare.map(id => {
-                  const college = colleges.find(c => c.id === id);
+                  const college = allColleges.find(c => c.id === id);
                   return (
                     <Badge key={id} variant="secondary" className="flex items-center gap-1 pr-1">
                       {college?.name}
@@ -606,7 +743,7 @@ const LearnerPortal = () => {
                 <tr className="border-b">
                   <th className="p-3 text-left sticky left-0 bg-card">CLEP Exam</th>
                   {selectedForCompare.map(id => {
-                    const college = colleges.find(c => c.id === id);
+                    const college = allColleges.find(c => c.id === id);
                     return (
                       <th key={id} className="p-3 text-left min-w-[200px]">
                         <div>
