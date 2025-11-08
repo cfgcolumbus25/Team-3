@@ -21,9 +21,9 @@ const anthropic = new Anthropic({
 });
 
 // Build context from university database based on user query
-function buildContextFromDatabase(userMessage: string): string {
+async function buildContextFromDatabase(userMessage: string): Promise<string> {
   const lowerMessage = userMessage.toLowerCase();
-  const universities = getAllUniversities();
+  const universities = await getAllUniversities();
   
   let context = `You are a helpful assistant for CLEP (College Level Examination Program) exam credit acceptance. You have access to data about ${universities.length} universities and their CLEP acceptance policies.\n\n`;
   
@@ -83,7 +83,7 @@ function buildContextFromDatabase(userMessage: string): string {
   let relevantUniversities = universities;
   
   if (mentionedState) {
-    relevantUniversities = filterUniversities({ state: mentionedState });
+    relevantUniversities = await filterUniversities({ state: mentionedState });
     const stateName = Object.keys(stateMap).find(k => stateMap[k] === mentionedState);
     contextParts.push(`User is asking about ${stateName?.toUpperCase() || mentionedState}. Found ${relevantUniversities.length} universities in ${mentionedState}.`);
   }
@@ -95,7 +95,7 @@ function buildContextFromDatabase(userMessage: string): string {
     );
     
     if (examNames.length > 0) {
-      relevantUniversities = filterUniversities({ examNames });
+      relevantUniversities = await filterUniversities({ examNames });
       contextParts.push(`User is asking about ${examNames.join(", ")}. Found ${relevantUniversities.length} universities that accept these exams.`);
     }
   }
@@ -106,7 +106,7 @@ function buildContextFromDatabase(userMessage: string): string {
     const score = parseInt(scoreMatch[1]);
     if (score >= 20 && score <= 80) {
       contextParts.push(`User mentioned a CLEP score of ${score}.`);
-      relevantUniversities = filterUniversities({ minScore: score });
+      relevantUniversities = await filterUniversities({ minScore: score });
     }
   }
   
@@ -167,7 +167,7 @@ export async function handleChatRequest(message: string): Promise<string> {
     }
     
     // Build context from university database
-    const context = buildContextFromDatabase(message);
+    const context = await buildContextFromDatabase(message);
     
     // Create prompt with context
     const prompt = `You are a helpful assistant for CLEP (College Level Examination Program) exam credit acceptance. You help students find universities that accept CLEP credits and answer questions about CLEP policies.

@@ -11,24 +11,24 @@ export interface ConfirmUpdateResponse {
 }
 
 // This will be called from the frontend
-// Persists updates to localStorage for the institution
+// Persists updates to Supabase for the institution
 export async function handleConfirmUpdate(
   actions: UpdateAction[],
-  institutionId: number
+  institutionDiCode: number
 ): Promise<ConfirmUpdateResponse> {
   try {
     if (!actions || !Array.isArray(actions) || actions.length === 0) {
       return { reply: "No updates to apply." };
     }
 
-    if (!institutionId) {
+    if (!institutionDiCode) {
       return {
-        reply: "Error: Institution ID is required. Please log in again.",
+        reply: "Error: Institution DI Code is required. Please log in again.",
       };
     }
 
     // Initialize default data if needed
-    initializeDefaultExamData(institutionId);
+    await initializeDefaultExamData(institutionDiCode);
 
     const errors: Array<{ exam: string; field: string; error: string }> = [];
     const successfulUpdates: string[] = [];
@@ -45,7 +45,7 @@ export async function handleConfirmUpdate(
       }
 
       // Get current exam data
-      const currentExam = getInstitutionExam(institutionId, action.exam);
+      const currentExam = await getInstitutionExam(institutionDiCode, action.exam);
 
       // Prepare update object
       const updates: Partial<{
@@ -71,12 +71,12 @@ export async function handleConfirmUpdate(
 
       // Preserve existing category if updating
       if (currentExam?.category) {
-        // Category is preserved automatically in updateInstitutionExam
+        updates.category = currentExam.category;
       }
 
       // Update the exam
-      const success = updateInstitutionExam(
-        institutionId,
+      const success = await updateInstitutionExam(
+        institutionDiCode,
         action.exam,
         updates
       );
@@ -115,7 +115,7 @@ export async function handleConfirmUpdate(
     const examNames = [...new Set(successfulUpdates)].join(", ");
 
     return {
-      reply: `✅ Successfully applied ${updateCount} update(s) to ${examNames}.\n\nYour changes have been saved to localStorage. You can view them in the Data Management page.`,
+      reply: `✅ Successfully applied ${updateCount} update(s) to ${examNames}.\n\nYour changes have been saved to the database. You can view them in the Data Management page.`,
     };
   } catch (error: any) {
     console.error("Confirm update error:", error);

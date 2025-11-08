@@ -166,8 +166,8 @@ export const InstitutionChatbot = ({ open, onOpenChange }: InstitutionChatbotPro
       if (answer.includes("yes") || answer.includes("confirm") || answer.includes("apply")) {
         // User confirmed -> commit updates
         try {
-          const institutionId = user?.institution?.id;
-          if (!institutionId) {
+          const institutionDiCode = user?.institution?.diCode;
+          if (!institutionDiCode) {
             setMessages(prev => [...prev, {
               id: (Date.now() + 1).toString(),
               text: "❌ Error: You must be logged in as an institution to update data.",
@@ -179,7 +179,7 @@ export const InstitutionChatbot = ({ open, onOpenChange }: InstitutionChatbotPro
           }
 
           const { handleConfirmUpdate } = await import("@/pages/api/confirm-update");
-          const data = await handleConfirmUpdate(pendingActions, institutionId);
+          const data = await handleConfirmUpdate(pendingActions, institutionDiCode);
 
           const aiMessage: Message = {
             id: (Date.now() + 1).toString(),
@@ -232,9 +232,9 @@ export const InstitutionChatbot = ({ open, onOpenChange }: InstitutionChatbotPro
     // Handle informational queries first
     if (!isUpdateCommand) {
       try {
-        const institutionId = user?.institution?.id || 0;
+        const institutionDiCode = user?.institution?.diCode || 0;
         const { handleInformationalQuery } = await import("@/pages/api/institution-chat");
-        const reply = handleInformationalQuery(messageText, institutionId);
+        const reply = handleInformationalQuery(messageText, institutionDiCode);
 
         const aiMessage: Message = {
           id: (Date.now() + 1).toString(),

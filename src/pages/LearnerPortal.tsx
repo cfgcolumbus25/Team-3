@@ -108,38 +108,64 @@ const LearnerPortal = () => {
     "Low score requirements",
   ];
 
-  // Get all universities and exams from database
-  const allUniversities = useMemo(() => getAllUniversities(), []);
+  const [allUniversities, setAllUniversities] = useState<College[]>([]);
+  const [filteredColleges, setFilteredColleges] = useState<College[]>([]);
+  const [loading, setLoading] = useState(true);
   const availableExams = useMemo(() => getAllExamNames(), []);
 
-  // Filter colleges based on filter state and then sort according to sortOption
-  const filteredColleges = useMemo(() => {
-    const examNames = userExamScores.map((e) => e.exam);
+  // Load universities
+  useEffect(() => {
+    const loadUniversities = async () => {
+      try {
+        setLoading(true);
+        const universities = await getAllUniversities();
+        setAllUniversities(universities as College[]);
+      } catch (error) {
+        console.error("Error loading universities:", error);
+      } finally {
+        setLoading(false);
+      }
+    };
+    loadUniversities();
+  }, []);
 
-    const filters = {
-      state: selectedState || undefined,
-      minScore: minScore > 0 ? minScore : undefined,
-      minCredits: minCredits > 0 ? minCredits : undefined,
-      examNames: examNames.length > 0 ? examNames : undefined,
-      minExamsAccepted: examNames.length > 0 ? examNames.length : undefined,
-      userExamScores: userExamScores.length > 0 ? userExamScores : undefined,
+  // Filter and sort colleges
+  useEffect(() => {
+    const filterAndSort = async () => {
+      if (allUniversities.length === 0) {
+        setFilteredColleges([]);
+        return;
+      }
+      
+      const examNames = userExamScores.map((e) => e.exam);
+
+      const filters = {
+        state: selectedState || undefined,
+        minScore: minScore > 0 ? minScore : undefined,
+        minCredits: minCredits > 0 ? minCredits : undefined,
+        examNames: examNames.length > 0 ? examNames : undefined,
+        minExamsAccepted: examNames.length > 0 ? examNames.length : undefined,
+        userExamScores: userExamScores.length > 0 ? userExamScores : undefined,
+      };
+
+      let results = await filterUniversities(filters) as College[];
+
+      // Sorting
+      if (sortOption === "name") {
+        results = results.slice().sort((a, b) => a.name.localeCompare(b.name));
+      } else if (sortOption === "lowestScore") {
+        results = results
+          .slice()
+          .sort((a, b) => (a.avgScore ?? Number.POSITIVE_INFINITY) - (b.avgScore ?? Number.POSITIVE_INFINITY));
+      } else if (sortOption === "mostExams") {
+        results = results.slice().sort((a, b) => (b.examsAccepted ?? 0) - (a.examsAccepted ?? 0));
+      }
+
+      setFilteredColleges(results);
     };
 
-    let results = filterUniversities(filters) as College[];
-
-    // Sorting
-    if (sortOption === "name") {
-      results = results.slice().sort((a, b) => a.name.localeCompare(b.name));
-    } else if (sortOption === "lowestScore") {
-      results = results
-        .slice()
-        .sort((a, b) => (a.avgScore ?? Number.POSITIVE_INFINITY) - (b.avgScore ?? Number.POSITIVE_INFINITY));
-    } else if (sortOption === "mostExams") {
-      results = results.slice().sort((a, b) => (b.examsAccepted ?? 0) - (a.examsAccepted ?? 0));
-    }
-
-    return results;
-  }, [selectedState, minScore, minCredits, userExamScores, sortOption]);
+    filterAndSort();
+  }, [selectedState, minScore, minCredits, userExamScores, sortOption, allUniversities]);
 
   // Filter handler functions
   const handleInstitutionTypeToggle = (type: string) => {

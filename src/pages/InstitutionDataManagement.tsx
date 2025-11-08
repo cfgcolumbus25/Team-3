@@ -34,56 +34,67 @@ const InstitutionDataManagement = () => {
   const [selectedExams, setSelectedExams] = useState<string[]>([]);
   const [hasChanges, setHasChanges] = useState(false);
   const [originalData, setOriginalData] = useState<ExamData[]>([]);
-
-  // Get the university data for the logged-in institution
-  const university = useMemo(() => {
-    if (!user?.institution?.diCode) return null;
-    return getUniversityByDiCode(user.institution.diCode);
-  }, [user]);
-
-  // Load real exam data from database and localStorage
+  const [university, setUniversity] = useState<any>(null);
   const [examData, setExamData] = useState<ExamData[]>([]);
+  const [loading, setLoading] = useState(true);
 
+  // Load university and exam data
   useEffect(() => {
-    if (!user?.institution?.id) return;
+    const loadData = async () => {
+      if (!user?.institution?.diCode) {
+        setLoading(false);
+        return;
+      }
 
-    const institutionId = user.institution.id;
-    initializeDefaultExamData(institutionId);
-    const storedData = getInstitutionExamData(institutionId);
+      try {
+        setLoading(true);
+        const uni = await getUniversityByDiCode(user.institution.diCode);
+        setUniversity(uni || null);
 
-    // Merge with university database data (prioritize stored data, fallback to database)
-    let mergedData: ExamData[] = [];
-    
-    if (university) {
-      mergedData = university.clepPolicies.map((policy, index) => {
-        const stored = storedData.find(
-          (e) => e.examName.toLowerCase() === policy.examName.toLowerCase()
-        );
-        return {
-          id: `exam-${index}`,
-          name: policy.examName,
-          minScore: stored?.minScore?.toString() || (policy.minimumScore?.toString() || ""),
-          credits: stored?.credits?.toString() || (policy.creditsAwarded?.toString() || ""),
-          courseCode: stored?.courseCode || (policy.classEquivalent?.toString() || ""),
-          lastUpdated: stored?.lastUpdated || "Never",
-          category: stored?.category || "General",
-        };
-      });
-    } else {
-      mergedData = storedData.map((exam, index) => ({
-        id: `exam-${index}`,
-        name: exam.examName,
-        minScore: exam.minScore?.toString() || "",
-        credits: exam.credits?.toString() || "",
-        courseCode: exam.courseCode || "",
-        lastUpdated: exam.lastUpdated || "Never",
-        category: exam.category || "General",
-      }));
-    }
+        await initializeDefaultExamData(user.institution.diCode);
+        const storedData = await getInstitutionExamData(user.institution.diCode);
 
-    setExamData(mergedData);
-    setOriginalData(JSON.parse(JSON.stringify(mergedData))); // Deep copy
-  }, [user, university]);
+        // Merge with university database data (prioritize stored data, fallback to database)
+        let mergedData: ExamData[] = [];
+        
+        if (uni) {
+          mergedData = uni.clepPolicies.map((policy: any, index: number) => {
+            const stored = storedData.find(
+              (e: any) => e.examName.toLowerCase() === policy.examName.toLowerCase()
+            );
+            return {
+              id: `exam-${index}`,
+              name: policy.examName,
+              minScore: stored?.minScore?.toString() || (policy.minimumScore?.toString() || ""),
+              credits: stored?.credits?.toString() || (policy.creditsAwarded?.toString() || ""),
+              courseCode: stored?.courseCode || (policy.classEquivalent?.toString() || ""),
+              lastUpdated: stored?.lastUpdated || "Never",
+              category: stored?.category || "General",
+            };
+          });
+        } else {
+          mergedData = storedData.map((exam: any, index: number) => ({
+            id: `exam-${index}`,
+            name: exam.examName,
+            minScore: exam.minScore?.toString() || "",
+            credits: exam.credits?.toString() || "",
+            courseCode: exam.courseCode || "",
+            lastUpdated: exam.lastUpdated || "Never",
+            category: exam.category || "General",
+          }));
+        }
+
+        setExamData(mergedData);
+        setOriginalData(JSON.parse(JSON.stringify(mergedData))); // Deep copy
+      } catch (error) {
+        console.error("Error loading exam data:", error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadData();
+  }, [user]);
 
   const handleCellEdit = (examId: string, field: keyof ExamData, value: string) => {
     setExamData((prev) =>
@@ -94,8 +105,8 @@ const InstitutionDataManagement = () => {
     setHasChanges(true);
   };
 
-  const handleSave = () => {
-    if (!user?.institution?.id) {
+  const handleSave = async () => {
+    if (!user?.institution?.diCode) {
       toast({
         title: "Error",
         description: "You must be logged in to save changes.",
@@ -104,13 +115,13 @@ const InstitutionDataManagement = () => {
       return;
     }
 
-    const institutionId = user.institution.id;
+    const institutionDiCode = user.institution.diCode;
     const errors: string[] = [];
 
     // Save each exam that has been modified
-    examData.forEach((exam) => {
+    for (const exam of examData) {
       const original = originalData.find((o) => o.id === exam.id);
-      if (!original) return;
+      if (!original) continue;
 
       // Check if this exam has changed
       const hasChanged =
@@ -131,12 +142,12 @@ const InstitutionDataManagement = () => {
         }
         updates.lastUpdated = new Date().toISOString().split("T")[0];
 
-        const success = updateInstitutionExam(institutionId, exam.name, updates);
+        const success = await updateInstitutionExam(institutionDiCode, exam.name, updates);
         if (!success) {
           errors.push(exam.name);
         }
       }
-    });
+    }
 
     if (errors.length > 0) {
       toast({
@@ -145,10 +156,10 @@ const InstitutionDataManagement = () => {
         variant: "destructive",
       });
     } else {
-      toast({
-        title: "Changes saved!",
-        description: "Your CLEP data has been updated successfully.",
-      });
+    toast({
+      title: "Changes saved!",
+      description: "Your CLEP data has been updated successfully.",
+    });
     }
 
     // Reload data to reflect saved changes
@@ -210,7 +221,7 @@ const InstitutionDataManagement = () => {
 
   // Calculate statistics
   const stats = useMemo(() => {
-    const totalCount = examData.length;
+  const totalCount = examData.length;
     const completedCount = examData.filter((e) => e.minScore && e.minScore !== "").length;
     
     // Calculate average minimum score

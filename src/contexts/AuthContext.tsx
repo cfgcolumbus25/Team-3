@@ -39,7 +39,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setIsLoading(false);
   }, []);
 
-  const login = (email: string, password: string, role: "admin" | "institution", institutionDiCode?: number): boolean => {
+  const login = async (email: string, password: string, role: "admin" | "institution", institutionDiCode?: number): Promise<boolean> => {
     // Accept any non-empty credentials
     if (!email.trim() || !password.trim()) {
       return false;
@@ -55,7 +55,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       if (!institutionDiCode) return false;
       
       // Find university by DI code from the full database (all 57 institutions)
-      const university = getUniversityByDiCode(institutionDiCode);
+      const university = await getUniversityByDiCode(institutionDiCode);
       if (university) {
         // Convert University to Institution format for compatibility
         const institution: Institution = {
@@ -72,8 +72,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         navigate("/institution");
         return true;
       }
+      return false;
     }
-    return false;
   };
 
   const logout = () => {

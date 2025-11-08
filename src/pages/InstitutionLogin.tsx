@@ -17,8 +17,16 @@ const InstitutionLogin = () => {
   const { login } = useAuth();
   const { toast } = useToast();
 
-  // Get all 57 universities from the database
-  const allUniversities = useMemo(() => getAllUniversities(), []);
+  const [allUniversities, setAllUniversities] = useState<any[]>([]);
+
+  // Load all universities
+  useEffect(() => {
+    const loadUniversities = async () => {
+      const universities = await getAllUniversities();
+      setAllUniversities(universities);
+    };
+    loadUniversities();
+  }, []);
 
   // Create institution options from all universities (using DI code as value)
   const institutionOptions = useMemo(() => 
@@ -32,6 +40,7 @@ const InstitutionLogin = () => {
 
   // Check for diCode in URL params (from learner portal click)
   useEffect(() => {
+    if (allUniversities.length === 0) return;
     const diCodeParam = searchParams.get("diCode");
     if (diCodeParam) {
       const university = allUniversities.find(u => u.diCode.toString() === diCodeParam);
@@ -45,7 +54,7 @@ const InstitutionLogin = () => {
     }
   }, [searchParams, allUniversities, toast]);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
     if (!selectedInstitution) {
@@ -69,7 +78,7 @@ const InstitutionLogin = () => {
     setIsLoading(true);
 
     // Simulate API call
-    setTimeout(() => {
+    setTimeout(async () => {
       // Find university by DI code (which is now the selected value)
       const university = allUniversities.find((u) => u.diCode === selectedInstitution);
       
@@ -84,7 +93,7 @@ const InstitutionLogin = () => {
       }
 
       // Login with the university's DI code
-      const success = login(
+      const success = await login(
         `admin@${university.name.toLowerCase().replace(/[^a-z0-9]/g, '')}.edu`,
         password,
         "institution",

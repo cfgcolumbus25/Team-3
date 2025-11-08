@@ -35,38 +35,56 @@ const InstitutionPortal = () => {
   const [selectedExam, setSelectedExam] = useState<any>(null);
   const [showUploadModal, setShowUploadModal] = useState(false);
   const [showChatbot, setShowChatbot] = useState(false);
+  const [university, setUniversity] = useState<any>(null);
+  const [institutionExamData, setInstitutionExamData] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  // Get the university data for the logged-in institution
-  const university = useMemo(() => {
-    if (!user?.institution?.diCode) return null;
-    return getUniversityByDiCode(user.institution.diCode);
+  // Load university and exam data
+  useEffect(() => {
+    const loadData = async () => {
+      if (!user?.institution?.diCode) {
+        setLoading(false);
+        return;
+      }
+
+      try {
+        setLoading(true);
+        const uni = await getUniversityByDiCode(user.institution.diCode);
+        setUniversity(uni || null);
+
+        if (uni) {
+          await initializeDefaultExamData(user.institution.diCode);
+          const storedData = await getInstitutionExamData(user.institution.diCode);
+          
+          // Merge with university database data (prioritize stored data, fallback to database)
+          const merged = uni.clepPolicies.map((policy: any) => {
+            const stored = storedData.find((e: any) => 
+              e.examName.toLowerCase() === policy.examName.toLowerCase()
+            );
+            return {
+              examName: policy.examName,
+              minScore: stored?.minScore || (policy.minimumScore?.toString() || ""),
+              credits: stored?.credits || (policy.creditsAwarded?.toString() || ""),
+              courseCode: stored?.courseCode || (policy.classEquivalent || ""),
+              lastUpdated: stored?.lastUpdated || "Never",
+              category: stored?.category || "General"
+            };
+          });
+          setInstitutionExamData(merged);
+        } else {
+          await initializeDefaultExamData(user.institution.diCode);
+          const storedData = await getInstitutionExamData(user.institution.diCode);
+          setInstitutionExamData(storedData);
+        }
+      } catch (error) {
+        console.error("Error loading institution data:", error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadData();
   }, [user]);
-
-  // Get institution-specific exam data from localStorage
-  const institutionExamData = useMemo(() => {
-    if (!user?.institution?.id) return [];
-    const institutionId = user.institution.id;
-    initializeDefaultExamData(institutionId);
-    const storedData = getInstitutionExamData(institutionId);
-    
-    // Merge with university database data (prioritize stored data, fallback to database)
-    if (university) {
-      return university.clepPolicies.map(policy => {
-        const stored = storedData.find(e => 
-          e.examName.toLowerCase() === policy.examName.toLowerCase()
-        );
-        return {
-          examName: policy.examName,
-          minScore: stored?.minScore || (policy.minimumScore?.toString() || ""),
-          credits: stored?.credits || (policy.creditsAwarded?.toString() || ""),
-          courseCode: stored?.courseCode || (policy.classEquivalent || ""),
-          lastUpdated: stored?.lastUpdated || "Never",
-          category: stored?.category || "General"
-        };
-      });
-    }
-    return storedData;
-  }, [user, university]);
 
   // Calculate statistics
   const stats = useMemo(() => {

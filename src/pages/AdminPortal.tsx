@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -18,17 +18,30 @@ import {
 import { getAllUniversities } from "@/lib/universityDatabase";
 
 export default function AdminPortal() {
-  // ✅ Load college data directly from JSON
-  const [colleges, setColleges] = useState(() =>
-    getAllUniversities().map((u, idx) => ({
-      id: idx + 1,
-      name: u.name,
-      acceptsCLEP: u.acceptsCLEP ? "Yes" : "No",
-      minScore: u.avgScore || "-",
-      subjects: u.clepPolicies?.length || 0,
-      lastUpdated: u.lastUpdated || "Unknown"
-    }))
-  );
+  // ✅ Load college data from Supabase
+  const [colleges, setColleges] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const loadColleges = async () => {
+      try {
+        const universities = await getAllUniversities();
+        setColleges(universities.map((u, idx) => ({
+          id: idx + 1,
+          name: u.name,
+          acceptsCLEP: u.examsAccepted > 0 ? "Yes" : "No",
+          minScore: u.avgScore || "-",
+          subjects: u.clepPolicies?.length || 0,
+          lastUpdated: "Unknown"
+        })));
+      } catch (error) {
+        console.error("Error loading colleges:", error);
+      } finally {
+        setLoading(false);
+      }
+    };
+    loadColleges();
+  }, []);
 
   // ✅ Alerts stay local
   const [alerts, setAlerts] = useState([

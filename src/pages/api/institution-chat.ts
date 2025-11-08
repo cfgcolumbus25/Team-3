@@ -1,7 +1,7 @@
 // Helper function to handle informational queries for institution chatbot
 // This handles questions that don't require data updates
 
-export function handleInformationalQuery(message: string, institutionId: number): string {
+export function handleInformationalQuery(message: string, institutionDiCode: number): string {
   const lower = message.toLowerCase();
   
   // View all data
