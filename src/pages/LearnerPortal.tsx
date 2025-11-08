@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useMemo } from "react";
-import { Send, Bot, User, ChevronLeft, ChevronRight, MapPin, Star, X, Grid3x3, List, Download, Trash2 } from "lucide-react";
+import { Send, Bot, User, ChevronLeft, ChevronRight, MapPin, Star, X, Grid3x3, List, Download, Trash2, Map } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
@@ -852,6 +852,47 @@ const LearnerPortal = () => {
                   </div>
                 </Card>
               ))}
+            </div>
+            
+            {/* Google Maps Section */}
+            <div className="mt-6 border-t border-border pt-6">
+              <div className="mb-4">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
+                    <Map className="h-5 w-5 text-primary" />
+                  </div>
+                  <div>
+                    <h3 className="font-semibold text-base">View Colleges on Map</h3>
+                    <p className="text-sm text-muted-foreground">
+                      See all matching colleges on an interactive map
+                    </p>
+                  </div>
+                </div>
+              </div>
+              
+              <div className="border border-border rounded-lg overflow-hidden">
+                <div className="bg-muted/30 p-4 border-b border-border">
+                  <p className="text-sm text-muted-foreground">
+                    Maps integration will be displayed here. This section will show all matching colleges on an interactive map.
+                  </p>
+                </div>
+                {/* Maps Container - Ready for integration */}
+                <div 
+                  id="google-maps-container"
+                  className="w-full h-[500px] bg-muted/20 flex items-center justify-center"
+                  style={{ minHeight: '500px' }}
+                >
+                  <div className="text-center space-y-2">
+                    <Map className="h-12 w-12 text-muted-foreground mx-auto opacity-50" />
+                    <p className="text-sm text-muted-foreground font-medium">
+                      Maps will be integrated here
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      This space is ready for Maps API integration
+                    </p>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
         </div>
