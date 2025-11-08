@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useMemo } from "react";
-import { Send, Bot, User, ChevronLeft, ChevronRight, MapPin, Star, X, Grid3x3, List, Download, Trash2 } from "lucide-react";
+import { Send, Bot, User, ChevronLeft, ChevronRight, ChevronDown, ChevronUp, MapPin, Star, X, Grid3x3, List, Download, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
@@ -783,9 +783,25 @@ const LearnerPortal = () => {
                           onChange={() => toggleCompare(college.id)}
                           className="rounded"
                         />
+                        {/* Replace full-width button with a compact chevron toggle */}
+                    <div className="flex justify-end">
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        aria-label={expandedCard === college.id ? "Collapse details" : "Expand details"}
+                        onClick={() => setExpandedCard(expandedCard === college.id ? null : college.id)}
+                        className="h-8 w-8 p-0"
+                      >
+                        {expandedCard === college.id ? (
+                          <ChevronUp className="h-4 w-4" />
+                        ) : (
+                          <ChevronDown className="h-4 w-4" />
+                        )}
+                      </Button>
+                    </div>
                       </div>
                     </div>
-
+                    
                     <div className="grid grid-cols-3 gap-2 text-xs">
                       <div>
                         <p className="text-muted-foreground">Exams</p>
@@ -801,14 +817,12 @@ const LearnerPortal = () => {
                       </div>
                     </div>
 
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      className="w-full text-xs"
-                      onClick={() => setExpandedCard(expandedCard === college.id ? null : college.id)}
-                    >
-                      {expandedCard === college.id ? "Hide Details" : "View Details"}
-                    </Button>
+                    
+
+                    {expandedCard === college.id && (
+                      <div className="border-t pt-3 space-y-2 animate-fade-in">
+                      </div>
+                    )}
 
                     {expandedCard === college.id && (
                       <div className="border-t pt-3 space-y-2 animate-fade-in">
