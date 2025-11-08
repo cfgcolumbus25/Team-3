@@ -1092,7 +1092,7 @@ const LearnerPortal = () => {
               <span className="font-semibold">Comparing {selectedForCompare.length} colleges</span>
               <div className="flex gap-2">
                 {selectedForCompare.map(id => {
-                  const college = getUniversityById(id);
+                  const college = allUniversities.find(u => u.id === id);
                   return (
                     <Badge key={id} variant="secondary" className="flex items-center gap-1 pr-1">
                       {college?.name}
@@ -1134,7 +1134,7 @@ const LearnerPortal = () => {
                 <tr className="border-b">
                   <th className="p-3 text-left sticky left-0 bg-card">CLEP Exam</th>
                   {selectedForCompare.map(id => {
-                    const college = getUniversityById(id);
+                    const college = allUniversities.find(u => u.id === id);
                     return (
                       <th key={id} className="p-3 text-left min-w-[200px]">
                         <div>
@@ -1152,7 +1152,7 @@ const LearnerPortal = () => {
                 {availableExams.map((examName) => {
                   // Get exam data for each selected university
                   const examData = selectedForCompare.map(id => {
-                    const university = getUniversityById(id);
+                    const university = allUniversities.find(u => u.id === id);
                     if (!university) return null;
                     const policy = university.clepPolicies.find(p => p.examName === examName);
                     return policy;
