@@ -12,6 +12,7 @@ import {
   getUniversityById,
   type University 
 } from "@/lib/universityDatabase";
+import CollegeMap from "@/components/CollegeMap";
 
 interface Message {
   id: string;
@@ -1018,26 +1019,12 @@ const LearnerPortal = () => {
               </div>
               
               <div className="border border-border rounded-lg overflow-hidden">
-                <div className="bg-muted/30 p-4 border-b border-border">
-                  <p className="text-sm text-muted-foreground">
-                    Maps integration will be displayed here. This section will show all matching colleges on an interactive map.
-                  </p>
-                </div>
-                {/* Maps Container - Ready for integration */}
                 <div 
                   id="google-maps-container"
-                  className="w-full h-[500px] bg-muted/20 flex items-center justify-center"
+                  className="w-full h-[500px]"
                   style={{ minHeight: '500px' }}
                 >
-                  <div className="text-center space-y-2">
-                    <Map className="h-12 w-12 text-muted-foreground mx-auto opacity-50" />
-                    <p className="text-sm text-muted-foreground font-medium">
-                      Maps will be integrated here
-                    </p>
-                    <p className="text-xs text-muted-foreground">
-                      This space is ready for Maps API integration
-                    </p>
-                  </div>
+                  <CollegeMap />
                 </div>
               </div>
             </div>
