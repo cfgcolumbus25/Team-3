@@ -1,7 +1,7 @@
 // Local database implementation using university_data.json
 // This provides a database-like interface without requiring Supabase
 
-import universityData from '../../university_data.json';
+import universityData from '../data/university_data.json';
 
 // Type definitions based on the JSON structure
 // Support both formats:
