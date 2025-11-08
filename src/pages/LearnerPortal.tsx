@@ -12,6 +12,9 @@ import {
   type University 
 } from "@/lib/universityDatabase";
 import CollegeMap from "@/components/CollegeMap";
+// npm install d3
+// npm install --save-dev @types/d3
+import * as d3 from "d3";
 
 interface Message {
   id: string;
@@ -355,6 +358,143 @@ const LearnerPortal = () => {
       e.exam === exam ? { ...e, score: numScore } : e
     ));
   };
+
+  // D3 donut visualization: run inside component and use allUniversities lookup
+  useEffect(() => {
+    // ensure previous chart cleared
+    d3.select("#d3-chart").selectAll("*").remove();
+
+    if (!showComparison) return;
+
+    const container = document.getElementById("d3-chart");
+    if (!container) return;
+
+    let cancelled = false;
+
+    const draw = () => {
+      if (cancelled) return;
+
+      // use actual layout width (getBoundingClientRect) and wait for a valid width
+      const containerRect = container.getBoundingClientRect();
+      const containerWidth = Math.max(200, Math.round(containerRect.width));
+      if (containerWidth < 50) {
+        // layout not ready yet — try again next frame
+        requestAnimationFrame(draw);
+        return;
+      }
+
+      const height = 160;
+      const padding = 16;
+
+      // prepare data
+      const data = selectedForCompare.map((id) => {
+        const college = allUniversities.find(u => u.id === id);
+        return {
+          id,
+          name: college?.name || `ID ${id}`,
+          value: Math.min(college?.examsAccepted ?? 0, 39), // cap at 39
+        };
+      });
+
+      // create single svg sized to container width
+      const svg = d3.select("#d3-chart")
+        .append("svg")
+        .attr("width", containerWidth)
+        .attr("height", height)
+        .attr("viewBox", `0 0 ${containerWidth} ${height}`)
+        .style("display", "block");
+
+      if (data.length === 0) {
+        svg.append("text")
+          .attr("x", containerWidth / 2)
+          .attr("y", height / 2)
+          .attr("text-anchor", "middle")
+          .style("fill", "#8b8f98")
+          .style("font-size", "14px")
+          .text("Select 2–4 colleges to compare visualization");
+        return;
+      }
+
+      const total = 39;
+      const gap = 12;
+      const perWidth = Math.max(120, Math.floor((containerWidth - padding * 2 - gap * (data.length - 1)) / data.length));
+      const color = d3.scaleOrdinal(d3.schemeTableau10 as any);
+
+      data.forEach((d, i) => {
+        const groupX = padding + i * (perWidth + gap);
+        const group = svg.append("g").attr("transform", `translate(${groupX},0)`);
+
+        const cx = perWidth / 2;
+        const cy = height / 2 - 8;
+        const radius = Math.max(18, Math.min(perWidth, height) / 2 - 20);
+        const inner = Math.max(8, radius - 12);
+
+        const arc = d3.arc().innerRadius(inner).outerRadius(radius);
+
+        // background (full circle)
+        const bgPath = (arc as any)({ startAngle: 0, endAngle: 2 * Math.PI }) as string;
+        group.append("path")
+          .attr("d", bgPath)
+          .attr("transform", `translate(${cx},${cy})`)
+          .attr("fill", "#414d69");
+
+        // foreground arc
+        const endAngle = (d.value / total) * 2 * Math.PI;
+        const fgPath = (arc as any)({ startAngle: 0, endAngle }) as string;
+        group.append("path")
+          .attr("d", fgPath)
+          .attr("transform", `translate(${cx},${cy})`)
+          .attr("fill", "#b0198a");
+
+        // center combined text (numerator above small denominator)
+        const text = group.append("text")
+          .attr("x", cx)
+          .attr("y", cy)
+          .attr("text-anchor", "middle")
+          .style("font-family", "Inter, ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial")
+          .style("fill", "#111");
+
+        text.append("tspan")
+          .attr("x", cx)
+          .attr("dy", "-6")
+          .style("font-size", "18px")
+          .style("font-weight", "700")
+          .text(String(d.value)); // numerator
+
+        text.append("tspan")
+          .attr("x", cx)
+          .attr("dy", "20")
+          .style("font-size", "12px")
+          .style("fill", "#666")
+          .text(`/${total}`);
+
+        // label below
+        group.append("text")
+          .attr("x", cx)
+          .attr("y", height - 6)
+          .attr("text-anchor", "middle")
+          .style("font-size", "11px")
+          .style("fill", "#666")
+          .text(d.name.length > 18 ? d.name.slice(0, 15) + "…" : d.name);
+      });
+    };
+
+    // draw after next frame to ensure modal layout is ready
+    requestAnimationFrame(draw);
+
+    // re-draw when container resizes
+    const ro = new ResizeObserver(() => {
+      d3.select("#d3-chart").selectAll("*").remove();
+      requestAnimationFrame(draw);
+    });
+    ro.observe(container);
+
+    return () => {
+      cancelled = true;
+      ro.disconnect();
+      d3.select("#d3-chart").selectAll("*").remove();
+    };
+  }, [showComparison, selectedForCompare, allUniversities]);
 
   return (
     <div className="min-h-screen bg-background flex flex-col">
@@ -1078,6 +1218,16 @@ const LearnerPortal = () => {
           <DialogHeader>
             <DialogTitle>College Comparison</DialogTitle>
           </DialogHeader>
+
+          {/* D3 Visualization Section (moved to top) */}
+          <div className="mt-2 mb-4">
+            <h3 className="font-semibold text-base">Visualization</h3>
+            <p className="text-sm text-muted-foreground mb-3">
+              Visual comparison of CLEP exam coverage among selected colleges (capped at 39).
+            </p>
+            <div id="d3-chart" className="w-full h-[180px] flex items-center gap-4 overflow-x-auto" />
+          </div>
+          
           <div className="overflow-x-auto">
             <table className="w-full border-collapse">
               <thead>
