@@ -20,7 +20,6 @@ export const Sidebar = ({ role }: SidebarProps) => {
 
   const adminLinks = [
     { icon: LayoutDashboard, label: "Dashboard", href: "/admin" },
-    { icon: Database, label: "Data Management", href: "/admin/data-management" },
     { icon: FileText, label: "Reports", href: "/admin/reports" },
     { icon: Settings, label: "Settings", href: "/admin/settings" },
   ];
